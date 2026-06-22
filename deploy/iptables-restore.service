@@ -1,0 +1,12 @@
+[Unit]
+Description=Restore iptables firewall rules
+After=network.target docker.service
+Before=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/sbin/iptables-restore /etc/iptables/rules.v4
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

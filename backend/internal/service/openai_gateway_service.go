@@ -1265,12 +1265,20 @@ func (s *OpenAIGatewayService) GenerateSessionHashWithFallback(c *gin.Context, b
 	return currentHash
 }
 
-func resolveOpenAIUpstreamOriginator(c *gin.Context, isOfficialClient bool) string {
+func resolveOpenAIUpstreamOriginator(c *gin.Context, account *Account, isOfficialClient bool) string {
+	// 优先级 1: 账户级 credentials.originator 显式覆写
+	if account != nil {
+		if v := account.GetOpenAIOriginator(); v != "" {
+			return v
+		}
+	}
+	// 优先级 2: 客户端传入 originator（回退兼容）
 	if c != nil {
 		if originator := strings.TrimSpace(c.GetHeader("originator")); originator != "" {
 			return originator
 		}
 	}
+	// 优先级 3: 默认值
 	if isOfficialClient {
 		return "codex_cli_rs"
 	}
@@ -3457,6 +3465,12 @@ func (s *OpenAIGatewayService) buildUpstreamRequestOpenAIPassthrough(
 		if req.Header.Get("OpenAI-Beta") == "" {
 			req.Header.Set("OpenAI-Beta", "responses=experimental")
 		}
+		// 服务端 originator 覆写：账户配置优先，回退默认值
+		if account != nil {
+			if v := account.GetOpenAIOriginator(); v != "" {
+				req.Header.Set("originator", v)
+			}
+		}
 		if req.Header.Get("originator") == "" {
 			req.Header.Set("originator", "codex_cli_rs")
 		}
@@ -4210,7 +4224,7 @@ func (s *OpenAIGatewayService) buildUpstreamRequest(ctx context.Context, c *gin.
 			req.Header.Del("originator")
 		} else {
 			req.Header.Set("OpenAI-Beta", "responses=experimental")
-			req.Header.Set("originator", resolveOpenAIUpstreamOriginator(c, isCodexCLI))
+			req.Header.Set("originator", resolveOpenAIUpstreamOriginator(c, account, isCodexCLI))
 		}
 		apiKeyID := getAPIKeyIDFromContext(c)
 		if isOpenAIResponsesCompactPath(c) {

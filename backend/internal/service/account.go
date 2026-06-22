@@ -1112,6 +1112,27 @@ func (a *Account) GetOpenAIUserAgent() string {
 	return a.GetCredential("user_agent")
 }
 
+// GetOpenAIOriginator returns the originator from account credentials.
+// Priority: credentials.originator → UA inference → empty.
+func (a *Account) GetOpenAIOriginator() string {
+	if !a.IsOpenAI() {
+		return ""
+	}
+	if v := a.GetCredential("originator"); v != "" {
+		return strings.TrimSpace(v)
+	}
+	// UA 推断：保持与 user-agent 同族
+	if ua := a.GetOpenAIUserAgent(); ua != "" {
+		if strings.HasPrefix(ua, "codex_vscode/") {
+			return "codex_vscode"
+		}
+		if strings.HasPrefix(ua, "codex_cli_rs/") || strings.HasPrefix(ua, "codex_cli") {
+			return "codex_cli_rs"
+		}
+	}
+	return ""
+}
+
 func (a *Account) GetChatGPTAccountID() string {
 	if !a.IsOpenAIOAuth() {
 		return ""

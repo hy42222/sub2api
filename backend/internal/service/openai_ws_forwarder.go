@@ -1155,7 +1155,7 @@ func (s *OpenAIGatewayService) buildOpenAIWSHeaders(
 		if chatgptAccountID := account.GetChatGPTAccountID(); chatgptAccountID != "" {
 			headers.Set("chatgpt-account-id", chatgptAccountID)
 		}
-		headers.Set("originator", resolveOpenAIUpstreamOriginator(c, isCodexCLI))
+		headers.Set("originator", resolveOpenAIUpstreamOriginator(c, account, isCodexCLI))
 	}
 
 	betaValue := openAIWSBetaV2Value
