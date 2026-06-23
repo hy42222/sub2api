@@ -1148,6 +1148,18 @@ func (s *OpenAIGatewayService) buildOpenAIWSHeaders(
 		headers.Set(openAIWSTurnStateHeader, state)
 	}
 	if metadata := strings.TrimSpace(turnMetadata); metadata != "" {
+		// Salt x-codex-turn-metadata for cross-account isolation.
+		// Compute the same isolated session ID that was set in the header above
+		// so the metadata's embedded session_id stays consistent.
+		isolatedSID := ""
+		if account != nil && account.Type == AccountTypeOAuth && sessionResolution.SessionID != "" {
+			isolatedSID = isolateOpenAISessionID(getAPIKeyIDFromContext(c), sessionResolution.SessionID)
+		} else if sessionResolution.SessionID != "" {
+			isolatedSID = sessionResolution.SessionID
+		}
+		if salted := saltCodexTurnMetadata(metadata, account, isolatedSID); salted != "" {
+			metadata = salted
+		}
 		headers.Set(openAIWSTurnMetadataHeader, metadata)
 	}
 
@@ -1816,6 +1828,21 @@ func (s *OpenAIGatewayService) forwardOpenAIWSV2(
 	if c != nil && c.Request != nil {
 		turnState = strings.TrimSpace(c.GetHeader(openAIWSTurnStateHeader))
 		turnMetadata = strings.TrimSpace(c.GetHeader(openAIWSTurnMetadataHeader))
+	}
+	// Salt x-codex-turn-metadata for cross-account isolation before it flows into
+	// both the WS client_metadata payload and the HTTP upgrade headers.
+	if turnMetadata != "" && account != nil {
+		apiKeyID := getAPIKeyIDFromContext(c)
+		sessionResolution := resolveOpenAIWSSessionHeaders(c, promptCacheKey)
+		isolatedSessionID := ""
+		if account.Type == AccountTypeOAuth && sessionResolution.SessionID != "" {
+			isolatedSessionID = isolateOpenAISessionID(apiKeyID, sessionResolution.SessionID)
+		} else if sessionResolution.SessionID != "" {
+			isolatedSessionID = sessionResolution.SessionID
+		}
+		if salted := saltCodexTurnMetadata(turnMetadata, account, isolatedSessionID); salted != "" {
+			turnMetadata = salted
+		}
 	}
 	setOpenAIWSTurnMetadata(payload, turnMetadata)
 	payloadEventType := openAIWSPayloadString(payload, "type")
@@ -2626,6 +2653,10 @@ func (s *OpenAIGatewayService) ProxyResponsesWebSocketFromClient(
 			)
 		}
 		if turnMetadata := strings.TrimSpace(c.GetHeader(openAIWSTurnMetadataHeader)); turnMetadata != "" {
+			// Salt x-codex-turn-metadata before injecting into WS client_metadata.
+			if salted := saltCodexTurnMetadata(turnMetadata, account, ""); salted != "" {
+				turnMetadata = salted
+			}
 			next, setErr := applyPayloadMutation(normalized, "client_metadata."+openAIWSTurnMetadataHeader, turnMetadata)
 			if setErr != nil {
 				return openAIWSClientPayload{}, NewOpenAIWSClientCloseError(coderws.StatusPolicyViolation, "invalid websocket request payload", setErr)

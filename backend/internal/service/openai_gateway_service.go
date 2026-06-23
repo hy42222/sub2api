@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -3506,6 +3507,14 @@ func (s *OpenAIGatewayService) buildUpstreamRequestOpenAIPassthrough(
 	// （Chrome/Firefox/Safari/Edge 等），替换为后台配置的 Codex UA，避免 Cloudflare 触发 JS 质询。
 	s.overrideBrowserUserAgent(ctx, account, req)
 
+	// Salt x-codex-turn-metadata for cross-account isolation.
+	if rawMetadata := req.Header.Get("x-codex-turn-metadata"); rawMetadata != "" {
+		isolatedSessionID := req.Header.Get("session_id")
+		if salted := saltCodexTurnMetadata(rawMetadata, account, isolatedSessionID); salted != "" {
+			req.Header.Set("x-codex-turn-metadata", salted)
+		}
+	}
+
 	if req.Header.Get("content-type") == "" {
 		req.Header.Set("content-type", "application/json")
 	}
@@ -4159,6 +4168,82 @@ func writeOpenAIPassthroughResponseHeaders(dst http.Header, src http.Header, fil
 	}
 }
 
+// saltCodexTurnMetadata applies account-salted HMAC rewriting to x-codex-turn-metadata JSON
+// to prevent cross-account user fingerprinting. It also syncs the embedded session_id with the
+// already-isolated header value so the metadata and header are consistent.
+//
+// Fields that identify "who" (installation_id, window_id) are replaced with account-derived
+// deterministic values — identical for all apiKeys sharing the same account, breaking
+// cross-account correlation while flattening multi-user differences within an account.
+//
+// Fields that identify "where" (workspaces: git remote URLs, commit hash, dirty state) are
+// stripped entirely — they are the strongest fingerprint and cannot be safely normalized.
+//
+// The turn_started_at_unix_ms timestamp is replaced with server time plus a
+// per-account deterministic offset (±20ms), within normal NTP jitter range,
+// eliminating cross-account time correlation without introducing abnormal clock skew.
+//
+// The function is idempotent: calling it multiple times with the same account produces the
+// same result for the deterministic fields.
+func saltCodexTurnMetadata(raw string, account *Account, isolatedSessionID string) string {
+	raw = strings.TrimSpace(raw)
+	if raw == "" || account == nil {
+		return raw
+	}
+
+	var meta map[string]any
+	if err := json.Unmarshal([]byte(raw), &meta); err != nil {
+		return raw
+	}
+
+	accountSecret := fmt.Sprintf("acct_%d_xcodex_metadata", account.ID)
+
+	// ── Layer 1: Sync session_id with isolated header value ──
+	if isolatedSessionID != "" {
+		meta["session_id"] = isolatedSessionID
+	}
+
+	// ── Layer 2: Replace identity fingerprints with account-derived values ──
+	meta["installation_id"] = hmacHex("installation", accountSecret)
+	meta["window_id"] = hmacHex("window", accountSecret)
+
+	// ── Layer 2: Workspace fingerprint pool ──
+	// Each account maintains a bounded pool of real workspace profiles (size =
+	// account.Concurrency). New fingerprints are admitted until the pool is full;
+	// thereafter new requests are mapped to the MRU existing profile so the
+	// number of distinct workspace fingerprints never exceeds the concurrency cap.
+	fingerprint := extractWorkspaceFingerprint(meta)
+	if fingerprint != "" {
+		originalWS := extractWorkspacesJSON(meta)
+		pool := getOrCreateWorkspacePool(account)
+		if replacement := pool.resolve(fingerprint, originalWS); replacement != originalWS {
+			var ws map[string]any
+			if json.Unmarshal([]byte(replacement), &ws) == nil {
+				meta["workspaces"] = ws
+			}
+		}
+	} else {
+		delete(meta, "workspaces")
+	}
+
+	// ── Layer 2: Replace client timestamp with server time + per-account deterministic
+	// offset (±20ms), simulating normal NTP jitter while breaking cross-account correlation.
+	meta["turn_started_at_unix_ms"] = time.Now().UnixMilli() + int64(account.ID%41-20)
+
+	result, err := json.Marshal(meta)
+	if err != nil {
+		return raw
+	}
+	return string(result)
+}
+
+// hmacHex returns the hex-encoded HMAC-SHA-256 of value under secret.
+func hmacHex(value, secret string) string {
+	mac := hmac.New(sha256.New, []byte(secret))
+	mac.Write([]byte(value))
+	return hex.EncodeToString(mac.Sum(nil))
+}
+
 func (s *OpenAIGatewayService) buildUpstreamRequest(ctx context.Context, c *gin.Context, account *Account, body []byte, token string, isStream bool, promptCacheKey string, isCodexCLI bool) (*http.Request, error) {
 	// Determine target URL based on account type
 	var targetURL string
@@ -4261,6 +4346,15 @@ func (s *OpenAIGatewayService) buildUpstreamRequest(ctx context.Context, c *gin.
 	// 浏览器型 UA 兜底：仅 OAuth（ChatGPT 内部接口）账号生效，若最终 user-agent 仍为浏览器
 	// （Chrome/Firefox/Safari/Edge 等），替换为后台配置的 Codex UA，避免 Cloudflare 触发 JS 质询。
 	s.overrideBrowserUserAgent(ctx, account, req)
+
+	// Salt x-codex-turn-metadata for cross-account isolation.
+	// Uses the already-isolated session_id header to keep metadata consistent.
+	if rawMetadata := req.Header.Get("x-codex-turn-metadata"); rawMetadata != "" {
+		isolatedSessionID := req.Header.Get("session_id")
+		if salted := saltCodexTurnMetadata(rawMetadata, account, isolatedSessionID); salted != "" {
+			req.Header.Set("x-codex-turn-metadata", salted)
+		}
+	}
 
 	// Ensure required headers exist
 	if req.Header.Get("content-type") == "" {
