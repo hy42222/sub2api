@@ -2,7 +2,10 @@ package service
 
 import (
 	"context"
+	"encoding/base64"
+	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	infraerrors "github.com/Wei-Shaw/sub2api/internal/pkg/errors"
@@ -176,6 +179,9 @@ func (s *AccountService) Create(ctx context.Context, req CreateAccountRequest) (
 	} else {
 		account.AutoPauseOnExpired = true
 	}
+
+	// 自动配置 OpenAI OAuth 账户的 UA/originator 和到期时间
+	applyOpenAIOAuthAutoConfig(account)
 
 	if err := s.accountRepo.Create(ctx, account); err != nil {
 		return nil, fmt.Errorf("create account: %w", err)
@@ -430,4 +436,66 @@ func (s *AccountService) TestCredentials(ctx context.Context, id int64) error {
 	default:
 		return fmt.Errorf("unsupported platform: %s", account.Platform)
 	}
+}
+
+// defaultOpenAIUserAgent is the unified VS Code User-Agent for codex_vscode family.
+const defaultOpenAIUserAgent = "codex_vscode/0.140.0-alpha.2 (Windows 10.0.26200; x86_64) unknown (VS Code; 26.609.30741)"
+
+// applyOpenAIOAuthAutoConfig auto-configures UA, originator, and subscription expiry
+// for newly created OpenAI OAuth accounts. It does NOT overwrite existing values.
+func applyOpenAIOAuthAutoConfig(account *Account) {
+	if account == nil || account.Platform != PlatformOpenAI || account.Type != AccountTypeOAuth {
+		return
+	}
+	if account.Credentials == nil {
+		account.Credentials = make(map[string]any)
+	}
+
+	// 自动设置统一的 user_agent
+	if _, ok := account.Credentials["user_agent"]; !ok {
+		account.Credentials["user_agent"] = defaultOpenAIUserAgent
+	}
+
+	// 自动设置统一的 originator
+	if _, ok := account.Credentials["originator"]; !ok {
+		account.Credentials["originator"] = "codex_vscode"
+	}
+
+	// 自动提取 ChatGPT 订阅到期时间
+	if account.ExpiresAt == nil {
+		if idToken, ok := account.Credentials["id_token"].(string); ok && idToken != "" {
+			if t := extractSubscriptionExpiry(idToken); t != nil {
+				account.ExpiresAt = t
+			}
+		}
+	}
+}
+
+// extractSubscriptionExpiry decodes a JWT id_token and extracts
+// chatgpt_subscription_active_until from the OpenAI auth claim.
+func extractSubscriptionExpiry(idToken string) *time.Time {
+	parts := strings.Split(idToken, ".")
+	if len(parts) < 2 {
+		return nil
+	}
+	payload, err := base64.RawURLEncoding.DecodeString(parts[1])
+	if err != nil {
+		return nil
+	}
+	var claims struct {
+		Auth struct {
+			SubActiveUntil string `json:"chatgpt_subscription_active_until"`
+		} `json:"https://api.openai.com/auth"`
+	}
+	if err := json.Unmarshal(payload, &claims); err != nil {
+		return nil
+	}
+	if claims.Auth.SubActiveUntil == "" {
+		return nil
+	}
+	t, err := time.Parse(time.RFC3339, claims.Auth.SubActiveUntil)
+	if err != nil {
+		return nil
+	}
+	return &t
 }
