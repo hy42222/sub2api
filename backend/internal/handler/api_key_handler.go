@@ -95,7 +95,12 @@ func (h *APIKeyHandler) List(c *gin.Context) {
 		}
 	}
 
-	keys, result, err := h.apiKeyService.List(c.Request.Context(), subject.UserID, params, filters)
+	// 管理员可查看所有 API Key，普通用户仅看自己的
+	userID := subject.UserID
+	if role, ok := middleware2.GetUserRoleFromContext(c); ok && role == "admin" {
+		userID = 0 // 0 表示不按用户过滤
+	}
+	keys, result, err := h.apiKeyService.List(c.Request.Context(), userID, params, filters)
 	if err != nil {
 		response.ErrorFrom(c, err)
 		return

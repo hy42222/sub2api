@@ -384,7 +384,10 @@ func (r *apiKeyRepository) deleteWithAudit(ctx context.Context, exec *dbent.Clie
 }
 
 func (r *apiKeyRepository) ListByUserID(ctx context.Context, userID int64, params pagination.PaginationParams, filters service.APIKeyListFilters) ([]service.APIKey, *pagination.PaginationResult, error) {
-	q := r.activeQuery().Where(apikey.UserIDEQ(userID))
+	q := r.activeQuery()
+	if userID != 0 { // 0 = admin 查看全部，不过滤用户
+		q = q.Where(apikey.UserIDEQ(userID))
+	}
 
 	// Apply filters
 	if filters.Search != "" {
