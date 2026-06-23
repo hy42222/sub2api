@@ -276,6 +276,16 @@ func (s *OpenAIGatewayService) ForwardAsAnthropic(
 		upstreamReq.Header.Set("x-codex-turn-state", compatTurnState)
 	}
 
+	// Re-salt x-codex-turn-metadata after session_id override to keep the
+	// embedded session_id consistent with the UUID-based header value.
+	// saltCodexTurnMetadata is idempotent for fingerprint fields.
+	if rawMetadata := upstreamReq.Header.Get("x-codex-turn-metadata"); rawMetadata != "" {
+		isolatedSessionID := upstreamReq.Header.Get("session_id")
+		if salted := saltCodexTurnMetadata(rawMetadata, account, isolatedSessionID); salted != "" {
+			upstreamReq.Header.Set("x-codex-turn-metadata", salted)
+		}
+	}
+
 	// 7. Send request
 	proxyURL := ""
 	if account.Proxy != nil {
