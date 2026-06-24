@@ -444,6 +444,9 @@ func NewOpenAIGatewayService(
 		openAITokenProvider.SetAccountRuntimeBlocker(svc)
 	}
 	svc.logOpenAIWSModeBootstrap()
+	if cfg != nil && cfg.Gateway.WorkspaceFingerprintIdleTimeoutMinutes > 0 {
+		WorkspaceFingerprintIdleTimeout = time.Duration(cfg.Gateway.WorkspaceFingerprintIdleTimeoutMinutes) * time.Minute
+	}
 	return svc
 }
 

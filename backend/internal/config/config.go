@@ -751,6 +751,9 @@ type GatewayConfig struct {
 	// 用于 Anthropic OAuth/SetupToken 账号的会话数量限制功能
 	// 空闲超过此时间的会话将被自动释放
 	SessionIdleTimeoutMinutes int `mapstructure:"session_idle_timeout_minutes"`
+	// WorkspaceFingerprintIdleTimeoutMinutes: workspace 指纹池 profile 空闲驱逐时间（分钟），默认 15 分钟。
+	// 基于 lastUsedAt 判断，活跃 profile 不会被驱逐。
+	WorkspaceFingerprintIdleTimeoutMinutes int `mapstructure:"workspace_fingerprint_idle_timeout_minutes"`
 
 	// StreamDataIntervalTimeout: 流数据间隔超时（秒），0表示禁用
 	StreamDataIntervalTimeout int `mapstructure:"stream_data_interval_timeout"`
@@ -1904,7 +1907,8 @@ func setDefaults() {
 	viper.SetDefault("gateway.idle_conn_timeout_seconds", 90) // 空闲连接超时（秒）
 	viper.SetDefault("gateway.max_upstream_clients", 5000)
 	viper.SetDefault("gateway.client_idle_ttl_seconds", 900)
-	viper.SetDefault("gateway.concurrency_slot_ttl_minutes", 30) // 并发槽位过期时间（支持超长请求）
+	viper.SetDefault("gateway.concurrency_slot_ttl_minutes", 30)               // 并发槽位过期时间（支持超长请求）
+	viper.SetDefault("gateway.workspace_fingerprint_idle_timeout_minutes", 15) // 指纹池 profile 空闲驱逐
 	viper.SetDefault("gateway.stream_data_interval_timeout", 180)
 	viper.SetDefault("gateway.stream_keepalive_interval", 10)
 	viper.SetDefault("gateway.image_stream_data_interval_timeout", 900)
