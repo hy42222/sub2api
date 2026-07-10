@@ -1,0 +1,4 @@
+interface:
+  display_name: "Sub2API Upstream Sync"
+  short_description: "Sync upstream main and document prod deltas"
+  default_prompt: "Use $sub2api-upstream-sync to sync upstream main into prod and update the branch-difference document."
