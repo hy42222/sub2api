@@ -47,6 +47,9 @@ func (s *OpenAIOAuthServiceSuite) TestExchangeCode_DefaultRedirectURI() {
 			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
+		if got := r.Header.Get("User-Agent"); got != "codex-cli/0.144.1" {
+			errCh <- "user-agent mismatch"
+		}
 		if err := r.ParseForm(); err != nil {
 			errCh <- "ParseForm failed"
 			w.WriteHeader(http.StatusBadRequest)
@@ -96,6 +99,9 @@ func (s *OpenAIOAuthServiceSuite) TestExchangeCode_DefaultRedirectURI() {
 func (s *OpenAIOAuthServiceSuite) TestRefreshToken_FormFields() {
 	errCh := make(chan string, 1)
 	s.setupServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if got := r.Header.Get("User-Agent"); got != "codex-cli/0.144.1" {
+			errCh <- "user-agent mismatch"
+		}
 		if err := r.ParseForm(); err != nil {
 			errCh <- "ParseForm failed"
 			w.WriteHeader(http.StatusBadRequest)

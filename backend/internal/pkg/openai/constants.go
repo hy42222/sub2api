@@ -41,8 +41,16 @@ func DefaultModelIDs() []string {
 	return ids
 }
 
-// DefaultTestModel default model for testing OpenAI accounts
-const DefaultTestModel = "gpt-5.4"
+const (
+	// DefaultTestModel default model for testing OpenAI accounts
+	DefaultTestModel = "gpt-5.4"
+
+	// CodexCLIVersion is the Codex version emitted by Sub2API OpenAI requests.
+	CodexCLIVersion = "0.144.1"
+
+	// CodexOAuthUserAgent is used for OpenAI OAuth token exchange and refresh.
+	CodexOAuthUserAgent = "codex-cli/" + CodexCLIVersion
+)
 
 // DefaultInstructions default instructions for non-Codex CLI requests.
 // 内容为真实 Codex CLI 的 GPT-5-Codex base prompt（codex 系模型默认）。
