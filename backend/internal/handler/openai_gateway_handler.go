@@ -2039,6 +2039,12 @@ func openAIForwardErrorAlreadyCommunicated(c *gin.Context, writerSizeBeforeForwa
 		return false
 	}
 
+	// handleErrorResponse / handleCompatErrorResponse 等在写入响应后会调用
+	// MarkResponseCommitted。Size 已变化 + Committed → 响应确已写出。
+	if service.IsResponseCommitted(c) {
+		return true
+	}
+
 	// cyber_policy 命中时上游原始错误体已透传给客户端（非流式 c.Data 写出 400 body，
 	// 流式写出 response.failed 事件），不能再让 ensureForwardErrorResponse 追加
 	// fallback —— 否则在已写出的完整响应尾部追加 SSE（responses 端点尾随
@@ -2051,6 +2057,7 @@ func openAIForwardErrorAlreadyCommunicated(c *gin.Context, writerSizeBeforeForwa
 	for _, prefix := range []string{
 		"upstream response failed:",
 		"non-streaming openai protocol error:",
+		"upstream error:",
 	} {
 		if strings.HasPrefix(msg, prefix) {
 			return true
