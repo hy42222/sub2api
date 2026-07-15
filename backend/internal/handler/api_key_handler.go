@@ -242,7 +242,12 @@ func (h *APIKeyHandler) Update(c *gin.Context) {
 		}
 	}
 
-	key, err := h.apiKeyService.Update(c.Request.Context(), keyID, subject.UserID, svcReq)
+	// 管理员可编辑任意 Key，传 userID=0 跳过所有权校验
+	uid := subject.UserID
+	if role, ok := middleware2.GetUserRoleFromContext(c); ok && role == "admin" {
+		uid = 0
+	}
+	key, err := h.apiKeyService.Update(c.Request.Context(), keyID, uid, svcReq)
 	if err != nil {
 		response.ErrorFrom(c, err)
 		return

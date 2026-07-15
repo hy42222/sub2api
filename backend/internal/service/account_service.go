@@ -304,6 +304,9 @@ func (s *AccountService) Update(ctx context.Context, id int64, req UpdateAccount
 		}
 	}
 
+	// 自动刷新 UA/originator/到期时间（兼容重授权场景）
+	applyOpenAIOAuthAutoConfig(account)
+
 	// 执行更新
 	if err := s.accountRepo.Update(ctx, account); err != nil {
 		return nil, fmt.Errorf("update account: %w", err)

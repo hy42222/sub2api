@@ -638,8 +638,8 @@ func (s *APIKeyService) Update(ctx context.Context, id int64, userID int64, req 
 		return nil, fmt.Errorf("get api key: %w", err)
 	}
 
-	// 验证所有权
-	if apiKey.UserID != userID {
+	// 验证所有权（管理员可编辑任意 Key）
+	if apiKey.UserID != userID && userID != 0 {
 		return nil, ErrInsufficientPerms
 	}
 
