@@ -3,12 +3,12 @@
 ## 当前基线
 
 - 更新日期：2026-07-16
-- 上游稳定版：`v0.1.156`（`12f991dde8a58e183d4bd16a87ef6fd0df714757`）
-- `prod` 升级合并：`434694ed2 merge: upgrade prod to upstream v0.1.156`
-- 最近一次远端整合：`ebfcb4d4e merge: integrate origin prod updates before v0.1.156`
-- 升级前回退分支：`backup/prod-pre-v0.1.156-20260716`
+- 上游稳定版：`v0.1.157`（`a2779cd5f30d6d3904a9d59088aed09507678dfe`）
+- `prod` 升级合并：`d5eac3fa5 merge: integrate origin prod v0.1.157`
+- 最近一次远端整合：`d5eac3fa5 merge: integrate origin prod v0.1.157`
+- 升级前回退分支：`backup/prod-pre-v0.1.157-20260716_190830`
 
-`v0.1.156` 和 `origin/prod` 均为当前 `prod` 的祖先。`prod` 在稳定版之外保留 22 个非 merge 的生产定制提交；同步和远端整合 merge 仅保留历史。`upstream/main` 已继续前进，不作为本次生产发布基线。
+`v0.1.157` 和 `origin/prod` 均为当前 `prod` 的祖先。`prod` 在稳定版之外保留注册安全、管理员 API Key 管理、生产部署和 Codex 兼容等定制；同步和远端整合 merge 仅保留历史。`upstream/main` 已继续前进，不作为本次生产发布基线。
 
 ## prod 专属改动
 
@@ -24,7 +24,7 @@
 | Codex 兼容修复 | `c08f22cd`, `bfe7be6a`, `70218dd4`, `05441539`, `1c005ee1`, `90c54d0a`, `dbb0c2be` | 保留原生压缩、修复续链 ID、tool_search、心跳生命周期、OAuth 身份和独立搜索端点。 |
 | 管理端策略 | `bac750c5`, `dcb641ae` | Fast/Flex 策略支持搜索用户，账号重新认证后刷新过期时间。 |
 
-当前相对 `v0.1.156` 的差异影响 33 个文件，主要在 `deploy/`、API Key 管理、OpenAI/Codex 转发、工作区指纹池和运维设置；另包含本文件和上游同步 skill。
+当前相对 `v0.1.157` 的差异影响 33 个文件，主要在 `deploy/`、API Key 管理、OpenAI/Codex 转发、工作区指纹池和运维设置；另包含本文件和上游同步 skill。
 
 ## 每次同步后的维护流程
 

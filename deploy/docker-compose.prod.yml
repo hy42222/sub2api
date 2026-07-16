@@ -38,7 +38,7 @@ services:
   # Sub2API Application (不直接暴露端口，仅通过 Caddy 访问)
   # ===========================================================================
   sub2api:
-    image: sub2api:0.1.156-local
+    image: sub2api:0.1.157-local
     container_name: sub2api
     restart: unless-stopped
     ulimits:
