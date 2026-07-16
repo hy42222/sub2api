@@ -9,106 +9,106 @@
 # =============================================================================
 
 api.hyailocalai.com {
-        # =========================================================================
-        # 静态资源长期缓存
-        # =========================================================================
-        @static {
-                path /assets/*
-        }
-        header @static {
-                Cache-Control "public, max-age=31536000, immutable"
-                -Pragma
-                -Expires
-        }
+	# =========================================================================
+	# 静态资源长期缓存
+	# =========================================================================
+	@static {
+		path /assets/*
+	}
+	header @static {
+		Cache-Control "public, max-age=31536000, immutable"
+		-Pragma
+		-Expires
+	}
 
-        # =========================================================================
-        # TLS 安全配置
-        # =========================================================================
-        tls {
-                protocols tls1.2 tls1.3
-                ciphers TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384 TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384 TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256 TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256 TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256 TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256
-        }
+	# =========================================================================
+	# TLS 安全配置
+	# =========================================================================
+	tls {
+		protocols tls1.2 tls1.3
+		ciphers TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384 TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384 TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256 TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256 TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256 TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256
+	}
 
-        # =========================================================================
-        # 反向代理到 Sub2API
-        # =========================================================================
-        reverse_proxy sub2api:8080 {
-                # 健康检查（更快检测故障，避免级联 503）
-                health_uri /health
-                health_interval 10s
-                health_timeout 15s
-                health_status 200
+	# =========================================================================
+	# 反向代理到 Sub2API
+	# =========================================================================
+	reverse_proxy sub2api:8080 {
+		# 健康检查（更快检测故障，避免级联 503）
+		health_uri /health
+		health_interval 10s
+		health_timeout 15s
+		health_status 200
 
-                # 传递真实客户端信息
-                header_up X-Real-IP {remote_host}
-                header_up X-Forwarded-For {remote_host}
-                header_up X-Forwarded-Proto {scheme}
-                header_up X-Forwarded-Host {host}
+		# 传递真实客户端信息
+		header_up X-Real-IP {remote_host}
+		header_up X-Forwarded-For {remote_host}
+		header_up X-Forwarded-Proto {scheme}
+		header_up X-Forwarded-Host {host}
 
-                # 连接池优化
-                transport http {
-                        keepalive 120s
-                        keepalive_idle_conns 256
-                        read_buffer 16KB
-                        write_buffer 16KB
-                        compression off
-                }
+		# 连接池优化
+		transport http {
+			keepalive 120s
+			keepalive_idle_conns 256
+			read_buffer 16KB
+			write_buffer 16KB
+			compression off
+		}
 
-                # 故障转移（快速恢复：10s 后重试，减少 503 窗口）
-                fail_duration 10s
-                max_fails 2
-                unhealthy_status 500 502 503 504
-        }
+		# 故障转移（快速恢复：10s 后重试，减少 503 窗口）
+		fail_duration 10s
+		max_fails 2
+		unhealthy_status 500 502 503 504
+	}
 
-        # =========================================================================
-        # 压缩配置
-        # =========================================================================
-        encode {
-                zstd
-                gzip 6
-                minimum_length 256
-                match {
-                        header Content-Type text/*
-                        header Content-Type application/json*
-                        header Content-Type application/javascript*
-                        header Content-Type application/xml*
-                        header Content-Type application/rss+xml*
-                        header Content-Type image/svg+xml*
-                }
-        }
+	# =========================================================================
+	# 压缩配置
+	# =========================================================================
+	encode {
+		zstd
+		gzip 6
+		minimum_length 256
+		match {
+			header Content-Type text/*
+			header Content-Type application/json*
+			header Content-Type application/javascript*
+			header Content-Type application/xml*
+			header Content-Type application/rss+xml*
+			header Content-Type image/svg+xml*
+		}
+	}
 
-        # =========================================================================
-        # 请求大小限制
-        # =========================================================================
-        request_body {
-                max_size 100MB
-        }
+	# =========================================================================
+	# 请求大小限制
+	# =========================================================================
+	request_body {
+		max_size 100MB
+	}
 
-        # =========================================================================
-        # 日志配置 — 已脱敏，不记录 Authorization/Cookie/Token
-        # =========================================================================
-        log {
-                output file /var/log/caddy/sub2api.log {
-                        roll_size 50mb
-                        roll_keep 10
-                        roll_keep_for 720h
-                }
-                format filter {
-                        wrap json
-                        fields {
-                                request>headers>Authorization delete
-                                request>headers>Cookie delete
-                                request>headers>X-Api-Key delete
-                                resp_headers>Set-Cookie delete
-                        }
-                }
-                level INFO
-        }
+	# =========================================================================
+	# 日志配置 — 已脱敏，不记录 Authorization/Cookie/Token
+	# =========================================================================
+	log {
+		output file /var/log/caddy/sub2api.log {
+			roll_size 50mb
+			roll_keep 10
+			roll_keep_for 720h
+		}
+		format filter {
+			wrap json
+			fields {
+				request>headers>Authorization delete
+				request>headers>Cookie delete
+				request>headers>X-Api-Key delete
+				resp_headers>Set-Cookie delete
+			}
+		}
+		level INFO
+	}
 
-        # =========================================================================
-        # 错误处理
-        # =========================================================================
-        handle_errors {
-                respond "{err.status_code} {err.status_text}"
-        }
+	# =========================================================================
+	# 错误处理
+	# =========================================================================
+	handle_errors {
+		respond "{err.status_code} {err.status_text}"
+	}
 }
