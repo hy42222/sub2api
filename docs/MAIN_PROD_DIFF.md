@@ -2,13 +2,13 @@
 
 ## 当前基线
 
-- 更新日期：2026-07-10
-- `main`：`9a2f11b4e21763cb7003ea29921d9a672ab50b1f`（跟踪 `upstream/main`）
-- `prod`：`f15e0a9d7ac69730d5693d06ec57267494923cfd`
-- 最近一次上游同步：`e1bb031d Merge upstream v0.1.150 into prod`
-- 最近一次远端整合：`f15e0a9d merge: integrate origin prod updates`
+- 更新日期：2026-07-16
+- 上游稳定版：`v0.1.156`（`12f991dde8a58e183d4bd16a87ef6fd0df714757`）
+- `prod` 升级合并：`434694ed2 merge: upgrade prod to upstream v0.1.156`
+- 最近一次远端整合：`ebfcb4d4e merge: integrate origin prod updates before v0.1.156`
+- 升级前回退分支：`backup/prod-pre-v0.1.156-20260716`
 
-`main` 是当前 `prod` 的祖先。`prod` 在 main 之外保留 13 个非 merge 提交：11 个生产功能提交、1 个测试提交和本文件的文档提交；同步和远端整合 merge 仅保留历史。因此 `git diff main..prod` 仅展示生产分支的专属文件差异。
+`v0.1.156` 和 `origin/prod` 均为当前 `prod` 的祖先。`prod` 在稳定版之外保留 22 个非 merge 的生产定制提交；同步和远端整合 merge 仅保留历史。`upstream/main` 已继续前进，不作为本次生产发布基线。
 
 ## prod 专属改动
 
@@ -16,15 +16,15 @@
 | --- | --- | --- |
 | 生产部署 | `c764bd90` | 生产部署配置、Caddy 配置、备份和健康检查脚本。 |
 | OpenAI OAuth 账户 | `781e0042`, `06fd20a3` | 新账户自动配置 UA、originator 和过期时间；OAuth 换 token 与网关统一使用 Codex 0.144.1。 |
-| 账号刷新 | `99da3081`, `a495d5e3` | 后台自动刷新纳入 setup-token 账号，并补充回归断言。 |
-| 管理端 API Key | `1de3c512` | 管理员可查看所有用户的 API Key。 |
+| 管理端 API Key | `1de3c512`, `91e80b6c`, `7bd41f6b` | 管理员可查看、改分组、完整编辑和删除任意用户的 API Key。 |
+| 注册安全 | `7bd41f6b` | 登录页按公开注册开关隐藏注册入口；生产环境关闭公开注册。 |
 | Codex 元数据隔离 | `7d7c4d9b`, `ddb2c886` | 会话 ID 覆盖后重新加盐 `x-codex-turn-metadata`，隔离跨账户指纹。 |
 | 工作区指纹池 | `0c99fe71` | 指纹池的空闲淘汰和可配置超时。 |
-| OpenAI 计费 | `de28eba3` | 加固 GPT-5.6 计费和使用量完整性。 |
-| Codex 图像生成 | `d3a1835e` | 转发时剥离 `image_gen` 命名空间声明。 |
 | 错误响应处理 | `e37e01b5` | 避免 `handleErrorResponse` 重复写入响应。 |
+| Codex 兼容修复 | `c08f22cd`, `bfe7be6a`, `70218dd4`, `05441539`, `1c005ee1`, `90c54d0a`, `dbb0c2be` | 保留原生压缩、修复续链 ID、tool_search、心跳生命周期、OAuth 身份和独立搜索端点。 |
+| 管理端策略 | `bac750c5`, `dcb641ae` | Fast/Flex 策略支持搜索用户，账号重新认证后刷新过期时间。 |
 
-当前差异影响 66 个文件，主要在 `deploy/`、账户和 API Key 服务、OpenAI 网关与计费服务、前端模型白名单以及运维设置模型；另包含本文件和上游同步 skill。
+当前相对 `v0.1.156` 的差异影响 33 个文件，主要在 `deploy/`、API Key 管理、OpenAI/Codex 转发、工作区指纹池和运维设置；另包含本文件和上游同步 skill。
 
 ## 每次同步后的维护流程
 
