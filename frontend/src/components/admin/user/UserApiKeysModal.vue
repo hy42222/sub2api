@@ -7,7 +7,64 @@
         </div>
         <div><p class="font-medium text-gray-900 dark:text-white">{{ user.email }}</p><p class="text-sm text-gray-500 dark:text-dark-400">{{ user.username }}</p></div>
       </div>
-      <div v-if="loading" class="flex justify-center py-8"><svg class="h-8 w-8 animate-spin text-primary-500" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg></div>
+      <form v-if="editingKey" class="space-y-4" @submit.prevent="saveEdit">
+        <div class="grid gap-4 sm:grid-cols-2">
+          <div>
+            <label class="input-label">{{ t('keys.nameLabel') }}</label>
+            <input v-model.trim="editForm.name" class="input" required maxlength="100" />
+          </div>
+          <div>
+            <label class="input-label">{{ t('keys.statusLabel') }}</label>
+            <select v-model="editForm.status" class="input">
+              <option value="">{{ t(`keys.status.${editingKey.status}`) }}</option>
+              <option value="active">{{ t('keys.status.active') }}</option>
+              <option value="inactive">{{ t('keys.status.inactive') }}</option>
+            </select>
+          </div>
+          <div>
+            <label class="input-label">{{ t('keys.groupLabel') }}</label>
+            <select v-model.number="editForm.groupId" class="input">
+              <option :value="0">{{ t('keys.noGroup') }}</option>
+              <option v-for="group in allGroups" :key="group.id" :value="group.id">{{ group.name }}</option>
+            </select>
+          </div>
+          <div>
+            <label class="input-label">{{ t('keys.quotaAmount') }}</label>
+            <input v-model.number="editForm.quota" class="input" type="number" min="0" step="0.000001" />
+          </div>
+          <div class="sm:col-span-2">
+            <label class="input-label">{{ t('keys.expirationDate') }}</label>
+            <input v-model="editForm.expiresAt" class="input" type="datetime-local" />
+          </div>
+          <div>
+            <label class="input-label">{{ t('keys.ipWhitelist') }}</label>
+            <textarea v-model="editForm.ipWhitelist" class="input min-h-24 font-mono text-sm" :placeholder="t('keys.ipWhitelistPlaceholder')"></textarea>
+          </div>
+          <div>
+            <label class="input-label">{{ t('keys.ipBlacklist') }}</label>
+            <textarea v-model="editForm.ipBlacklist" class="input min-h-24 font-mono text-sm" :placeholder="t('keys.ipBlacklistPlaceholder')"></textarea>
+          </div>
+          <div>
+            <label class="input-label">{{ t('keys.rateLimit5h') }}</label>
+            <input v-model.number="editForm.rateLimit5h" class="input" type="number" min="0" step="0.000001" />
+          </div>
+          <div>
+            <label class="input-label">{{ t('keys.rateLimit1d') }}</label>
+            <input v-model.number="editForm.rateLimit1d" class="input" type="number" min="0" step="0.000001" />
+          </div>
+          <div>
+            <label class="input-label">{{ t('keys.rateLimit7d') }}</label>
+            <input v-model.number="editForm.rateLimit7d" class="input" type="number" min="0" step="0.000001" />
+          </div>
+        </div>
+        <div class="flex justify-end gap-3 border-t border-gray-200 pt-4 dark:border-dark-600">
+          <button type="button" class="btn-secondary" :disabled="saving" @click="cancelEdit">{{ t('common.cancel') }}</button>
+          <button type="submit" class="btn-primary" :disabled="saving || !editForm.name">
+            {{ saving ? t('keys.saving') : t('common.save') }}
+          </button>
+        </div>
+      </form>
+      <div v-else-if="loading" class="flex justify-center py-8"><svg class="h-8 w-8 animate-spin text-primary-500" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg></div>
       <div v-else-if="apiKeys.length === 0" class="py-8 text-center"><p class="text-sm text-gray-500">{{ t('admin.users.noApiKeys') }}</p></div>
       <div v-else ref="scrollContainerRef" class="max-h-96 space-y-3 overflow-y-auto" @scroll="closeGroupSelector">
         <div v-for="key in apiKeys" :key="key.id" class="rounded-xl border border-gray-200 bg-white p-4 dark:border-dark-600 dark:bg-dark-800">
@@ -15,6 +72,14 @@
             <div class="min-w-0 flex-1">
               <div class="mb-1 flex items-center gap-2"><span class="font-medium text-gray-900 dark:text-white">{{ key.name }}</span><span :class="['badge text-xs', key.status === 'active' ? 'badge-success' : 'badge-danger']">{{ key.status }}</span></div>
               <p class="truncate font-mono text-sm text-gray-500">{{ key.key.substring(0, 20) }}...{{ key.key.substring(key.key.length - 8) }}</p>
+            </div>
+            <div class="ml-3 flex shrink-0 items-center gap-1">
+              <button class="icon-btn" type="button" :title="t('keys.editKey')" @click="startEdit(key)">
+                <Icon name="edit" size="sm" />
+              </button>
+              <button class="icon-btn text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20" type="button" :title="t('keys.deleteKey')" @click="deletingKey = key">
+                <Icon name="trash" size="sm" />
+              </button>
             </div>
           </div>
           <div class="mt-3 flex flex-wrap gap-4 text-xs text-gray-500">
@@ -103,18 +168,30 @@
       </div>
     </div>
   </Teleport>
+
+  <ConfirmDialog
+    :show="deletingKey !== null"
+    :title="t('keys.deleteKey')"
+    :message="t('keys.deleteConfirmMessage', { name: deletingKey?.name || '' })"
+    :confirm-text="t('common.delete')"
+    danger
+    @confirm="confirmDelete"
+    @cancel="deletingKey = null"
+  />
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, onUnmounted, type ComponentPublicInstance } from 'vue'
+import { ref, reactive, computed, watch, onMounted, onUnmounted, type ComponentPublicInstance } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useAppStore } from '@/stores/app'
 import { adminAPI } from '@/api/admin'
 import { formatDateTime } from '@/utils/format'
-import type { AdminUser, AdminGroup, ApiKey } from '@/types'
+import type { AdminUser, AdminGroup, ApiKey, UpdateApiKeyRequest } from '@/types'
 import BaseDialog from '@/components/common/BaseDialog.vue'
+import ConfirmDialog from '@/components/common/ConfirmDialog.vue'
 import GroupBadge from '@/components/common/GroupBadge.vue'
 import GroupOptionItem from '@/components/common/GroupOptionItem.vue'
+import Icon from '@/components/icons/Icon.vue'
 
 const props = defineProps<{ show: boolean; user: AdminUser | null }>()
 const emit = defineEmits(['close'])
@@ -124,12 +201,27 @@ const appStore = useAppStore()
 const apiKeys = ref<ApiKey[]>([])
 const allGroups = ref<AdminGroup[]>([])
 const loading = ref(false)
+const saving = ref(false)
+const editingKey = ref<ApiKey | null>(null)
+const deletingKey = ref<ApiKey | null>(null)
 const updatingKeyIds = ref(new Set<number>())
 const groupSelectorKeyId = ref<number | null>(null)
 const dropdownPosition = ref<{ top: number; left: number } | null>(null)
 const dropdownRef = ref<HTMLElement | null>(null)
 const scrollContainerRef = ref<HTMLElement | null>(null)
 const groupButtonRefs = ref<Map<number, HTMLElement>>(new Map())
+const editForm = reactive({
+  name: '',
+  status: '' as '' | 'active' | 'inactive',
+  groupId: 0,
+  quota: 0,
+  expiresAt: '',
+  ipWhitelist: '',
+  ipBlacklist: '',
+  rateLimit5h: 0,
+  rateLimit1d: 0,
+  rateLimit7d: 0
+})
 
 const selectedKeyForGroup = computed(() => {
   if (groupSelectorKeyId.value === null) return null
@@ -150,6 +242,8 @@ watch(() => props.show, (v) => {
     loadGroups()
   } else {
     closeGroupSelector()
+    cancelEdit()
+    deletingKey.value = null
   }
 })
 
@@ -226,6 +320,85 @@ const changeGroup = async (key: ApiKey, newGroupId: number | null) => {
   }
 }
 
+const toLocalDateTimeValue = (value: string | null): string => {
+  if (!value) return ''
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return ''
+  return new Date(date.getTime() - date.getTimezoneOffset() * 60_000).toISOString().slice(0, 16)
+}
+
+const parseIPLines = (value: string): string[] =>
+  value.split(/\r?\n/).map((line) => line.trim()).filter(Boolean)
+
+const startEdit = (key: ApiKey) => {
+  closeGroupSelector()
+  editingKey.value = key
+  editForm.name = key.name
+  editForm.status = key.status === 'active' || key.status === 'inactive' ? key.status : ''
+  editForm.groupId = key.group_id || 0
+  editForm.quota = key.quota || 0
+  editForm.expiresAt = toLocalDateTimeValue(key.expires_at)
+  editForm.ipWhitelist = (key.ip_whitelist || []).join('\n')
+  editForm.ipBlacklist = (key.ip_blacklist || []).join('\n')
+  editForm.rateLimit5h = key.rate_limit_5h || 0
+  editForm.rateLimit1d = key.rate_limit_1d || 0
+  editForm.rateLimit7d = key.rate_limit_7d || 0
+}
+
+const cancelEdit = () => {
+  editingKey.value = null
+  saving.value = false
+}
+
+const saveEdit = async () => {
+  const key = editingKey.value
+  if (!key || !editForm.name.trim()) return
+
+  saving.value = true
+  try {
+    const updates: UpdateApiKeyRequest = {
+      name: editForm.name.trim(),
+      ip_whitelist: parseIPLines(editForm.ipWhitelist),
+      ip_blacklist: parseIPLines(editForm.ipBlacklist),
+      quota: Number(editForm.quota) || 0,
+      expires_at: editForm.expiresAt ? new Date(editForm.expiresAt).toISOString() : '',
+      rate_limit_5h: Number(editForm.rateLimit5h) || 0,
+      rate_limit_1d: Number(editForm.rateLimit1d) || 0,
+      rate_limit_7d: Number(editForm.rateLimit7d) || 0
+    }
+    if (editForm.status) updates.status = editForm.status
+
+    let updated = await adminAPI.apiKeys.updateApiKey(key.id, updates)
+    const nextGroupID = editForm.groupId || null
+    if (nextGroupID !== key.group_id) {
+      const groupResult = await adminAPI.apiKeys.updateApiKeyGroup(key.id, nextGroupID)
+      updated = groupResult.api_key
+    }
+
+    const index = apiKeys.value.findIndex((item) => item.id === key.id)
+    if (index !== -1) apiKeys.value[index] = updated
+    appStore.showSuccess(t('keys.keyUpdatedSuccess'))
+    editingKey.value = null
+  } catch (error: any) {
+    appStore.showError(error?.message || t('keys.failedToSave'))
+  } finally {
+    saving.value = false
+  }
+}
+
+const confirmDelete = async () => {
+  const key = deletingKey.value
+  if (!key) return
+  try {
+    await adminAPI.apiKeys.deleteApiKey(key.id)
+    apiKeys.value = apiKeys.value.filter((item) => item.id !== key.id)
+    appStore.showSuccess(t('keys.keyDeletedSuccess'))
+    deletingKey.value = null
+  } catch (error: any) {
+    appStore.showError(error?.message || t('keys.failedToDelete'))
+  }
+}
+
 const handleKeyDown = (event: KeyboardEvent) => {
   if (event.key === 'Escape' && groupSelectorKeyId.value !== null) {
     event.stopPropagation()
@@ -246,6 +419,8 @@ const handleClickOutside = (event: MouseEvent) => {
 
 const handleClose = () => {
   closeGroupSelector()
+  cancelEdit()
+  deletingKey.value = null
   emit('close')
 }
 

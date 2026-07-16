@@ -38,7 +38,7 @@ services:
   # Sub2API Application (不直接暴露端口，仅通过 Caddy 访问)
   # ===========================================================================
   sub2api:
-    image: sub2api:local
+    image: sub2api:0.1.155-local
     container_name: sub2api
     restart: unless-stopped
     ulimits:
@@ -169,7 +169,10 @@ services:
       # =======================================================================
       # OpenAI HTTP/2 配置
       # =======================================================================
-      - GATEWAY_OPENAI_RESPONSE_HEADER_TIMEOUT=0
+      - GATEWAY_OPENAI_RESPONSE_HEADER_TIMEOUT=${GATEWAY_OPENAI_RESPONSE_HEADER_TIMEOUT:-90}
+      - GATEWAY_OPENAI_SCHEDULER_STICKY_ESCAPE_ENABLED=${GATEWAY_OPENAI_SCHEDULER_STICKY_ESCAPE_ENABLED:-true}
+      - GATEWAY_OPENAI_SCHEDULER_STICKY_ESCAPE_TTFT_MS=${GATEWAY_OPENAI_SCHEDULER_STICKY_ESCAPE_TTFT_MS:-15000}
+      - GATEWAY_OPENAI_SCHEDULER_STICKY_ESCAPE_ERROR_RATE=${GATEWAY_OPENAI_SCHEDULER_STICKY_ESCAPE_ERROR_RATE:-0.5}
       - GATEWAY_OPENAI_HTTP2_ENABLED=true
       - GATEWAY_OPENAI_HTTP2_ALLOW_PROXY_FALLBACK_TO_HTTP1=true
       - GATEWAY_OPENAI_HTTP2_FALLBACK_ERROR_THRESHOLD=2

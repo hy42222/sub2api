@@ -35,10 +35,10 @@ api.hyailocalai.com {
         # 反向代理到 Sub2API
         # =========================================================================
         reverse_proxy sub2api:8080 {
-                # 健康检查
+                # 健康检查（更快检测故障，避免级联 503）
                 health_uri /health
-                health_interval 30s
-                health_timeout 10s
+                health_interval 10s
+                health_timeout 15s
                 health_status 200
 
                 # 传递真实客户端信息
@@ -56,9 +56,9 @@ api.hyailocalai.com {
                         compression off
                 }
 
-                # 故障转移
-                fail_duration 30s
-                max_fails 3
+                # 故障转移（快速恢复：10s 后重试，减少 503 窗口）
+                fail_duration 10s
+                max_fails 2
                 unhealthy_status 500 502 503 504
         }
 

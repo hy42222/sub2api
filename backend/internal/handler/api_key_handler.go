@@ -271,7 +271,12 @@ func (h *APIKeyHandler) Delete(c *gin.Context) {
 		return
 	}
 
-	err = h.apiKeyService.Delete(c.Request.Context(), keyID, subject.UserID)
+	// 管理员可删除任意 Key，传 userID=0 跳过所有权校验。
+	uid := subject.UserID
+	if role, ok := middleware2.GetUserRoleFromContext(c); ok && role == "admin" {
+		uid = 0
+	}
+	err = h.apiKeyService.Delete(c.Request.Context(), keyID, uid)
 	if err != nil {
 		response.ErrorFrom(c, err)
 		return

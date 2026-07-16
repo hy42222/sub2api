@@ -335,6 +335,20 @@ func TestApiKeyService_Delete_Success(t *testing.T) {
 	require.False(t, exists, "delete should clear touch debounce cache")
 }
 
+func TestApiKeyService_Delete_AdminCanDeleteAnyKey(t *testing.T) {
+	repo := &apiKeyRepoStub{
+		apiKey: &APIKey{ID: 43, UserID: 9, Key: "admin-deleted-key"},
+	}
+	cache := &apiKeyCacheStub{}
+	svc := &APIKeyService{apiKeyRepo: repo, cache: cache}
+
+	err := svc.Delete(context.Background(), 43, 0)
+	require.NoError(t, err)
+	require.Equal(t, []int64{43}, repo.deletedIDs)
+	require.Equal(t, []int64{9}, cache.invalidated)
+	require.Equal(t, []string{svc.authCacheKey("admin-deleted-key")}, cache.deleteAuthKeys)
+}
+
 // TestApiKeyService_Delete_NotFound 测试删除不存在的 API Key 时返回正确的错误。
 // 预期行为：
 //   - GetKeyAndOwnerID 返回 ErrAPIKeyNotFound 错误

@@ -764,8 +764,8 @@ func (s *APIKeyService) Delete(ctx context.Context, id int64, userID int64) erro
 		return fmt.Errorf("get api key: %w", err)
 	}
 
-	// 验证当前用户是否为该 API Key 的所有者
-	if ownerID != userID {
+	// 验证当前用户是否为该 API Key 的所有者（管理员传 0 跳过校验）。
+	if ownerID != userID && userID != 0 {
 		return ErrInsufficientPerms
 	}
 
@@ -776,7 +776,7 @@ func (s *APIKeyService) Delete(ctx context.Context, id int64, userID int64) erro
 
 	// 删除成功后再清理缓存,避免"缓存已清但删除失败"的竞态。
 	if s.cache != nil {
-		_ = s.cache.DeleteCreateAttemptCount(ctx, userID)
+		_ = s.cache.DeleteCreateAttemptCount(ctx, ownerID)
 	}
 	s.InvalidateAuthCacheByKey(ctx, key)
 	s.lastUsedTouchL1.Delete(id)
