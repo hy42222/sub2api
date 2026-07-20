@@ -1,17 +1,19 @@
+{
+	servers {
+		max_header_size 64KB
+		timeouts {
+			read_header 10s
+			idle 2m
+		}
+	}
+}
+
 # =============================================================================
-# Sub2API Caddy 生产配置
-# =============================================================================
-# ⚠️ 部署前请将 your-domain.com 替换为你的真实域名
-# 如果没有域名，先设置 DNS A 记录指向本服务器 IP
-#
-# 也支持多个域名:
-#   sub2api.your-domain.com, api.your-domain.com {
+# Sub2API Caddy production configuration
 # =============================================================================
 
 api.hyailocalai.com {
-	# =========================================================================
-	# 静态资源长期缓存
-	# =========================================================================
+	# Fingerprinted frontend assets are immutable.
 	@static {
 		path /assets/*
 	}
@@ -21,31 +23,27 @@ api.hyailocalai.com {
 		-Expires
 	}
 
-	# =========================================================================
-	# TLS 安全配置
-	# =========================================================================
 	tls {
 		protocols tls1.2 tls1.3
 		ciphers TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384 TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384 TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256 TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256 TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256 TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256
 	}
 
-	# =========================================================================
-	# 反向代理到 Sub2API
-	# =========================================================================
 	reverse_proxy sub2api:8080 {
-		# 健康检查（更快检测故障，避免级联 503）
 		health_uri /health
 		health_interval 10s
 		health_timeout 15s
 		health_status 200
 
-		# 传递真实客户端信息
+		lb_policy round_robin
+		lb_try_duration 5s
+		lb_try_interval 250ms
+
+		# Generate forwarding headers from the direct TCP peer, not client input.
 		header_up X-Real-IP {remote_host}
 		header_up X-Forwarded-For {remote_host}
 		header_up X-Forwarded-Proto {scheme}
 		header_up X-Forwarded-Host {host}
 
-		# 连接池优化
 		transport http {
 			keepalive 120s
 			keepalive_idle_conns 256
@@ -54,15 +52,11 @@ api.hyailocalai.com {
 			compression off
 		}
 
-		# 故障转移（快速恢复：10s 后重试，减少 503 窗口）
 		fail_duration 10s
 		max_fails 2
 		unhealthy_status 500 502 503 504
 	}
 
-	# =========================================================================
-	# 压缩配置
-	# =========================================================================
 	encode {
 		zstd
 		gzip 6
@@ -77,16 +71,11 @@ api.hyailocalai.com {
 		}
 	}
 
-	# =========================================================================
-	# 请求大小限制
-	# =========================================================================
 	request_body {
-		max_size 100MB
+		max_size 256MB
 	}
 
-	# =========================================================================
-	# 日志配置 — 已脱敏，不记录 Authorization/Cookie/Token
-	# =========================================================================
+	# Sensitive request and response headers must never reach access logs.
 	log {
 		output file /var/log/caddy/sub2api.log {
 			roll_size 50mb
@@ -105,9 +94,6 @@ api.hyailocalai.com {
 		level INFO
 	}
 
-	# =========================================================================
-	# 错误处理
-	# =========================================================================
 	handle_errors {
 		respond "{err.status_code} {err.status_text}"
 	}
