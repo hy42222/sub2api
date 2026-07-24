@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"sort"
 	"strings"
 	"time"
 
@@ -13,6 +14,10 @@ import (
 // PrivacyClientFactory creates an HTTP client for privacy API calls.
 // Injected from repository layer to avoid import cycles.
 type PrivacyClientFactory func(proxyURL string) (*req.Client, error)
+
+type activePrivacyProxyLister interface {
+	ListActive(ctx context.Context) ([]Proxy, error)
+}
 
 const (
 	openAISettingsURL = "https://chatgpt.com/backend-api/settings/account_user_setting"
@@ -84,6 +89,62 @@ func disableOpenAITraining(ctx context.Context, clientFactory PrivacyClientFacto
 
 	slog.Info("openai_privacy_training_disabled")
 	return PrivacyModeTrainingOff
+}
+
+// disableOpenAITrainingWithProxyFallback retries through active proxies when
+// the account's preferred route cannot reach the ChatGPT settings endpoint.
+func disableOpenAITrainingWithProxyFallback(
+	ctx context.Context,
+	clientFactory PrivacyClientFactory,
+	accessToken string,
+	preferredProxyURL string,
+	proxyRepo activePrivacyProxyLister,
+) string {
+	return runOpenAIPrivacyWithProxyFallback(ctx, preferredProxyURL, proxyRepo, func(proxyURL string) string {
+		return disableOpenAITraining(ctx, clientFactory, accessToken, proxyURL)
+	})
+}
+
+func runOpenAIPrivacyWithProxyFallback(
+	ctx context.Context,
+	preferredProxyURL string,
+	proxyRepo activePrivacyProxyLister,
+	attempt func(proxyURL string) string,
+) string {
+	mode := attempt(preferredProxyURL)
+	if mode == PrivacyModeTrainingOff || proxyRepo == nil {
+		return mode
+	}
+
+	proxies, err := proxyRepo.ListActive(ctx)
+	if err != nil {
+		slog.Warn("openai_privacy_proxy_fallback_list_failed", "error", err.Error())
+		return mode
+	}
+	sort.Slice(proxies, func(i, j int) bool { return proxies[i].ID < proxies[j].ID })
+
+	now := time.Now()
+	for i := range proxies {
+		proxy := &proxies[i]
+		if proxy.IsExpired(now) {
+			continue
+		}
+		proxyURL := proxy.URL()
+		if proxyURL == "" || proxyURL == preferredProxyURL {
+			continue
+		}
+
+		retryMode := attempt(proxyURL)
+		if retryMode != "" {
+			mode = retryMode
+		}
+		if retryMode == PrivacyModeTrainingOff {
+			slog.Info("openai_privacy_proxy_fallback_succeeded", "proxy_id", proxy.ID)
+			return retryMode
+		}
+	}
+
+	return mode
 }
 
 // ChatGPTAccountInfo 从 chatgpt.com/backend-api/accounts/check 获取的账号信息

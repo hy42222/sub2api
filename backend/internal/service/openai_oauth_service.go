@@ -291,7 +291,7 @@ func (s *OpenAIOAuthService) enrichTokenInfo(ctx context.Context, tokenInfo *Ope
 	}
 
 	// 尝试设置隐私（关闭训练数据共享），best-effort
-	tokenInfo.PrivacyMode = disableOpenAITraining(ctx, s.privacyClientFactory, tokenInfo.AccessToken, proxyURL)
+	tokenInfo.PrivacyMode = disableOpenAITrainingWithProxyFallback(ctx, s.privacyClientFactory, tokenInfo.AccessToken, proxyURL, s.proxyRepo)
 }
 
 func shouldApplyChatGPTAccountInfoPlanType(current, candidate string) bool {
