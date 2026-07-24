@@ -865,6 +865,13 @@ func (s *OpenAIGatewayService) proxyResponsesWebSocketV2Passthrough(
 				}()
 			}
 			if isResponseCreate {
+				if persona, ok := codexFingerprintPersonaFromContext(c); ok {
+					rewritten, rewriteErr := rewriteCodexFingerprintPayloadForContext(c, payload, *persona)
+					if rewriteErr != nil {
+						return payload, nil, NewOpenAIWSClientCloseError(coderws.StatusInternalError, "failed to apply Codex fingerprint persona", rewriteErr)
+					}
+					payload = rewritten
+				}
 				if account.IsOpenAIOAuth() && isOpenAIResponsesLiteWebSocketPayload(payload) {
 					litePayload, _, liteErr := normalizeOpenAIResponsesLiteToolsPayload(payload)
 					if liteErr != nil {

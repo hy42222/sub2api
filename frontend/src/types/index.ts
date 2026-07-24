@@ -984,6 +984,10 @@ export interface Account {
   max_sessions?: number | null
   session_idle_timeout_minutes?: number | null
 
+  // OpenAI/Codex outbound persona pool
+  codex_fingerprint_pool_size?: number | null
+  codex_fingerprint_idle_timeout_days?: number | null
+
   // RPM 限制（仅 Anthropic OAuth/SetupToken 账号有效）
   base_rpm?: number | null
   rpm_strategy?: string | null

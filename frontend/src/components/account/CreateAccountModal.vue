@@ -2802,6 +2802,40 @@
         </div>
       </div>
 
+      <!-- OpenAI Codex 指纹池 -->
+      <div
+        v-if="form.platform === 'openai' && (accountCategory === 'oauth-based' || accountCategory === 'apikey')"
+        class="grid grid-cols-1 gap-4 border-t border-gray-200 pt-4 dark:border-dark-600 sm:grid-cols-2"
+      >
+        <div>
+          <label class="input-label">{{ t('admin.accounts.openai.codexFingerprintPoolSize') }}</label>
+          <input
+            v-model.number="codexFingerprintPoolSize"
+            type="number"
+            min="0"
+            max="64"
+            step="1"
+            class="input"
+            data-testid="codex-fingerprint-pool-size"
+          />
+          <p class="input-hint">{{ t('admin.accounts.openai.codexFingerprintPoolSizeDesc') }}</p>
+        </div>
+        <div>
+          <label class="input-label">{{ t('admin.accounts.openai.codexFingerprintIdleTimeoutDays') }}</label>
+          <input
+            v-model.number="codexFingerprintIdleTimeoutDays"
+            type="number"
+            min="1"
+            max="3650"
+            step="1"
+            class="input"
+            :disabled="codexFingerprintPoolSize <= 0"
+            data-testid="codex-fingerprint-idle-timeout-days"
+          />
+          <p class="input-hint">{{ t('admin.accounts.openai.codexFingerprintIdleTimeoutDaysDesc') }}</p>
+        </div>
+      </div>
+
       <!-- Anthropic API Key 自动透传开关 -->
       <div
         v-if="form.platform === 'anthropic' && accountCategory === 'apikey'"
@@ -3785,6 +3819,8 @@ const openAIResponsesMode = ref<OpenAIResponsesMode>('auto')
 const openAIEndpointCapabilities = ref<OpenAIEndpointCapability[]>(['chat_completions', 'embeddings'])
 const openaiOAuthResponsesWebSocketV2Mode = ref<OpenAIWSMode>(OPENAI_WS_MODE_OFF)
 const openaiAPIKeyResponsesWebSocketV2Mode = ref<OpenAIWSMode>(OPENAI_WS_MODE_OFF)
+const codexFingerprintPoolSize = ref(0)
+const codexFingerprintIdleTimeoutDays = ref(30)
 const codexCLIOnlyEnabled = ref(false)
 const codexCLIOnlyAppServerEnabled = ref(false)
 type AnthropicAPIKeyAuthScheme = 'x_api_key' | 'authorization_bearer'
@@ -4663,6 +4699,8 @@ const resetForm = () => {
   openAIEndpointCapabilities.value = ['chat_completions', 'embeddings']
   openaiOAuthResponsesWebSocketV2Mode.value = OPENAI_WS_MODE_OFF
   openaiAPIKeyResponsesWebSocketV2Mode.value = OPENAI_WS_MODE_OFF
+  codexFingerprintPoolSize.value = 0
+  codexFingerprintIdleTimeoutDays.value = 30
   codexCLIOnlyEnabled.value = false
   codexCLIOnlyAppServerEnabled.value = false
   anthropicPassthroughEnabled.value = false
@@ -4724,6 +4762,13 @@ const buildOpenAIExtra = (base?: Record<string, unknown>): Record<string, unknow
   }
 
   const extra: Record<string, unknown> = { ...(base || {}) }
+  if (codexFingerprintPoolSize.value > 0) {
+    extra.codex_fingerprint_pool_size = Math.min(64, Math.max(1, Math.trunc(codexFingerprintPoolSize.value)))
+    extra.codex_fingerprint_idle_timeout_days = Math.min(3650, Math.max(1, Math.trunc(codexFingerprintIdleTimeoutDays.value || 30)))
+  } else {
+    delete extra.codex_fingerprint_pool_size
+    delete extra.codex_fingerprint_idle_timeout_days
+  }
   if (accountCategory.value === 'oauth-based') {
     extra.openai_oauth_responses_websockets_v2_mode = openaiOAuthResponsesWebSocketV2Mode.value
     extra.openai_oauth_responses_websockets_v2_enabled = isOpenAIWSModeEnabled(openaiOAuthResponsesWebSocketV2Mode.value)

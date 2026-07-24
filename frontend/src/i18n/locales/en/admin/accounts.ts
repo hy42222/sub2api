@@ -437,6 +437,10 @@ export default {
       openai: {
         baseUrlHint: 'Leave default for official OpenAI API',
         apiKeyHint: 'Your OpenAI API Key',
+        codexFingerprintPoolSize: 'Codex persona pool size',
+        codexFingerprintPoolSizeDesc: 'Zero disables pooling. Enabled accounts expose at most this many stable installation identities upstream.',
+        codexFingerprintIdleTimeoutDays: 'Persona idle threshold (days)',
+        codexFingerprintIdleTimeoutDaysDesc: 'A full pool may rotate its least-recently-used persona only after this idle period.',
         oauthPassthrough: 'Auto passthrough (auth only)',
         oauthPassthroughDesc:
           'When enabled, this OpenAI account uses automatic passthrough: the gateway forwards request/response as-is and only swaps auth, while keeping billing/concurrency/audit and necessary safety filtering.',

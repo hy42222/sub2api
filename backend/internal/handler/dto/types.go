@@ -224,6 +224,10 @@ type Account struct {
 	MaxSessions           *int `json:"max_sessions,omitempty"`
 	SessionIdleTimeoutMin *int `json:"session_idle_timeout_minutes,omitempty"`
 
+	// OpenAI/Codex outbound persona pool configuration.
+	CodexFingerprintPoolSize        *int `json:"codex_fingerprint_pool_size,omitempty"`
+	CodexFingerprintIdleTimeoutDays *int `json:"codex_fingerprint_idle_timeout_days,omitempty"`
+
 	// RPM 限制（仅 Anthropic OAuth/SetupToken 账号有效）
 	// 从 extra 字段提取，方便前端显示和编辑
 	BaseRPM          *int    `json:"base_rpm,omitempty"`

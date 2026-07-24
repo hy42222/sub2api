@@ -20,8 +20,6 @@ import (
 // Forward forwards request to OpenAI API
 func (s *OpenAIGatewayService) Forward(ctx context.Context, c *gin.Context, account *Account, body []byte) (*OpenAIForwardResult, error) {
 	startTime := time.Now()
-	// 固定渠道映射后的请求级 canonical body；账号 normalize/strip 不得改写跨 failover hint。
-	canonicalImageIntentBody := body
 
 	restrictionResult := s.detectCodexClientRestriction(c, account, body)
 	apiKeyID := getAPIKeyIDFromContext(c)
@@ -36,6 +34,17 @@ func (s *OpenAIGatewayService) Forward(ctx context.Context, c *gin.Context, acco
 		})
 		return nil, errors.New("codex_cli_only restriction: only codex official clients are allowed")
 	}
+
+	fingerprintedBody, _, fingerprintErr := s.applyCodexFingerprintPersona(ctx, c, account, body)
+	if fingerprintErr != nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": gin.H{
+			"type": "api_error", "message": "Codex fingerprint pool is temporarily unavailable",
+		}})
+		return nil, fingerprintErr
+	}
+	body = fingerprintedBody
+	// 固定渠道映射后的请求级 canonical body；账号 normalize/strip 不得改写跨 failover hint。
+	canonicalImageIntentBody := body
 
 	normalizedBody, normalized, err := normalizeOpenAICodexCompactReasoningEffortForAccount(c, account, body)
 	if err != nil {
@@ -1085,6 +1094,9 @@ func (s *OpenAIGatewayService) buildUpstreamRequest(ctx context.Context, c *gin.
 
 	// 账号级请求头覆写（仅 openai api_key 账号启用时生效；OAuth 路径 no-op）
 	account.ApplyHeaderOverrides(req.Header)
+	if err := enforceCodexFingerprintPersonaHeaders(c, req.Header); err != nil {
+		return nil, fmt.Errorf("enforce codex fingerprint headers: %w", err)
+	}
 
 	return req, nil
 }

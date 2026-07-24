@@ -1894,6 +1894,40 @@
         </div>
       </div>
 
+      <!-- OpenAI Codex 指纹池 -->
+      <div
+        v-if="account?.platform === 'openai' && (account?.type === 'oauth' || account?.type === 'setup-token' || account?.type === 'apikey')"
+        class="grid grid-cols-1 gap-4 border-t border-gray-200 pt-4 dark:border-dark-600 sm:grid-cols-2"
+      >
+        <div>
+          <label class="input-label">{{ t('admin.accounts.openai.codexFingerprintPoolSize') }}</label>
+          <input
+            v-model.number="codexFingerprintPoolSize"
+            type="number"
+            min="0"
+            max="64"
+            step="1"
+            class="input"
+            data-testid="codex-fingerprint-pool-size"
+          />
+          <p class="input-hint">{{ t('admin.accounts.openai.codexFingerprintPoolSizeDesc') }}</p>
+        </div>
+        <div>
+          <label class="input-label">{{ t('admin.accounts.openai.codexFingerprintIdleTimeoutDays') }}</label>
+          <input
+            v-model.number="codexFingerprintIdleTimeoutDays"
+            type="number"
+            min="1"
+            max="3650"
+            step="1"
+            class="input"
+            :disabled="codexFingerprintPoolSize <= 0"
+            data-testid="codex-fingerprint-idle-timeout-days"
+          />
+          <p class="input-hint">{{ t('admin.accounts.openai.codexFingerprintIdleTimeoutDaysDesc') }}</p>
+        </div>
+      </div>
+
       <!-- OpenAI 订阅档位手动覆盖（Plus/Pro/Free），仅 OAuth 非影子账号 -->
       <div
         v-if="account?.platform === 'openai' && account?.type === 'oauth' && !isSparkShadow"
@@ -2837,6 +2871,8 @@ const openAIResponsesMode = ref<OpenAIResponsesMode>('auto')
 const openAIEndpointCapabilities = ref<OpenAIEndpointCapability[]>(['chat_completions', 'embeddings'])
 const openaiOAuthResponsesWebSocketV2Mode = ref<OpenAIWSMode>(OPENAI_WS_MODE_OFF)
 const openaiAPIKeyResponsesWebSocketV2Mode = ref<OpenAIWSMode>(OPENAI_WS_MODE_OFF)
+const codexFingerprintPoolSize = ref(0)
+const codexFingerprintIdleTimeoutDays = ref(30)
 const codexCLIOnlyEnabled = ref(false)
 const codexCLIOnlyAppServerEnabled = ref(false)
 type CodexImageToolMode = 'inherit' | 'enabled' | 'disabled' | 'block'
@@ -3272,6 +3308,8 @@ const syncFormFromAccount = (newAccount: Account | null) => {
   openAICompactModelMappings.value = []
   openaiOAuthResponsesWebSocketV2Mode.value = OPENAI_WS_MODE_OFF
   openaiAPIKeyResponsesWebSocketV2Mode.value = OPENAI_WS_MODE_OFF
+  codexFingerprintPoolSize.value = 0
+  codexFingerprintIdleTimeoutDays.value = 30
   codexCLIOnlyEnabled.value = false
   codexCLIOnlyAppServerEnabled.value = false
   codexImageToolMode.value = 'inherit'
@@ -3279,6 +3317,12 @@ const syncFormFromAccount = (newAccount: Account | null) => {
   anthropicAPIKeyAuthScheme.value = 'x_api_key'
   webSearchEmulationMode.value = 'default'
   if (newAccount.platform === 'openai' && (newAccount.type === 'oauth' || newAccount.type === 'setup-token' || newAccount.type === 'apikey')) {
+    codexFingerprintPoolSize.value = typeof extra?.codex_fingerprint_pool_size === 'number'
+      ? Math.min(64, Math.max(0, Math.trunc(extra.codex_fingerprint_pool_size)))
+      : 0
+    codexFingerprintIdleTimeoutDays.value = typeof extra?.codex_fingerprint_idle_timeout_days === 'number'
+      ? Math.min(3650, Math.max(1, Math.trunc(extra.codex_fingerprint_idle_timeout_days)))
+      : 30
     openaiPassthroughEnabled.value = extra?.openai_passthrough === true || extra?.openai_oauth_passthrough === true
     const longContextBillingValue = extra?.openai_long_context_billing_enabled
     openAILongContextBillingEnabled.value = longContextBillingValue === true
@@ -4508,6 +4552,13 @@ const handleSubmit = async () => {
       }
       delete newExtra.responses_websockets_v2_enabled
       delete newExtra.openai_ws_enabled
+      if (codexFingerprintPoolSize.value > 0) {
+        newExtra.codex_fingerprint_pool_size = Math.min(64, Math.max(1, Math.trunc(codexFingerprintPoolSize.value)))
+        newExtra.codex_fingerprint_idle_timeout_days = Math.min(3650, Math.max(1, Math.trunc(codexFingerprintIdleTimeoutDays.value || 30)))
+      } else {
+        delete newExtra.codex_fingerprint_pool_size
+        delete newExtra.codex_fingerprint_idle_timeout_days
+      }
       if (openaiPassthroughEnabled.value) {
         newExtra.openai_passthrough = true
       } else {

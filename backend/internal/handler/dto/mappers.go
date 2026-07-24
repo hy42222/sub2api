@@ -311,6 +311,13 @@ func AccountFromServiceShallow(a *service.Account) *Account {
 			}
 		}
 	}
+	if a.Platform == service.PlatformOpenAI {
+		if poolSize := a.GetCodexFingerprintPoolSize(); poolSize > 0 {
+			out.CodexFingerprintPoolSize = &poolSize
+			idleDays := a.GetCodexFingerprintIdleTimeoutDays()
+			out.CodexFingerprintIdleTimeoutDays = &idleDays
+		}
+	}
 
 	// 提取账号配额限制（apikey / bedrock 类型有效）
 	if a.IsAPIKeyOrBedrock() {
