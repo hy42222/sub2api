@@ -38,7 +38,7 @@ services:
   # Sub2API Application (不直接暴露端口，仅通过 Caddy 访问)
   # ===========================================================================
   sub2api:
-    image: sub2api:0.1.161-local
+    image: sub2api:0.1.164-local
     container_name: sub2api
     restart: unless-stopped
     ulimits:
@@ -257,18 +257,22 @@ services:
       - ./redis_data:/data
     command: >
       sh -c '
-        redis-server
-        --save 60 1
-        --appendonly yes
-        --appendfsync everysec
-        ${REDIS_PASSWORD:+--requirepass "$REDIS_PASSWORD"}'
+        redis-server \
+        --save 60 1 \
+        --appendonly yes \
+        --appendfsync everysec \
+        $${REDIS_PASSWORD:+--requirepass "$$REDIS_PASSWORD"}'
     environment:
       - TZ=Asia/Shanghai
-      - REDISCLI_AUTH=${REDIS_PASSWORD:-}
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-}
     networks:
       - sub2api-network
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test:
+        [
+          "CMD-SHELL",
+          'if [ -n "$$REDIS_PASSWORD" ]; then redis-cli --no-auth-warning -a "$$REDIS_PASSWORD" ping; else redis-cli ping; fi',
+        ]
       interval: 10s
       timeout: 5s
       retries: 5
