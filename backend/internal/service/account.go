@@ -2623,6 +2623,38 @@ func (a *Account) GetSessionIdleTimeoutMinutes() int {
 	return 5
 }
 
+// GetCodexFingerprintPoolSize returns the maximum number of outbound Codex
+// personas kept for this upstream account. Zero disables persona pooling.
+func (a *Account) GetCodexFingerprintPoolSize() int {
+	if a == nil || a.Extra == nil {
+		return 0
+	}
+	value := parseExtraInt(a.Extra["codex_fingerprint_pool_size"])
+	if value < 0 {
+		return 0
+	}
+	if value > 64 {
+		return 64
+	}
+	return value
+}
+
+// GetCodexFingerprintIdleTimeoutDays returns how long an unused persona must
+// stay idle before a full pool may rotate it. The default is 30 days.
+func (a *Account) GetCodexFingerprintIdleTimeoutDays() int {
+	if a == nil || a.Extra == nil {
+		return 30
+	}
+	value := parseExtraInt(a.Extra["codex_fingerprint_idle_timeout_days"])
+	if value <= 0 {
+		return 30
+	}
+	if value > 3650 {
+		return 3650
+	}
+	return value
+}
+
 // GetBaseRPM 获取基础 RPM 限制
 // 返回 0 表示未启用（负数视为无效配置，按 0 处理）
 func (a *Account) GetBaseRPM() int {

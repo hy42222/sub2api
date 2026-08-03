@@ -42,6 +42,7 @@ func (s *OpenAIGatewayService) ForwardAsAnthropic(
 	}
 
 	startTime := time.Now()
+	captureCodexFingerprintInboundIdentity(ctx, c, body)
 
 	// 1. Parse Anthropic request
 	var anthropicReq apicompat.AnthropicRequest
@@ -244,6 +245,13 @@ func (s *OpenAIGatewayService) ForwardAsAnthropic(
 		}
 	}
 
+	fingerprintedBody, _, fingerprintErr := s.applyCodexFingerprintPersona(ctx, c, account, responsesBody)
+	if fingerprintErr != nil {
+		writeAnthropicError(c, http.StatusServiceUnavailable, "api_error", "Codex fingerprint pool is temporarily unavailable")
+		return nil, fingerprintErr
+	}
+	responsesBody = fingerprintedBody
+
 	// 4c. Apply OpenAI fast policy (may filter service_tier or block the request).
 	// Mirrors the Claude anthropic-beta "fast-mode-2026-02-01" filter, but keyed
 	// on the body-level service_tier field (priority/flex).
@@ -333,7 +341,13 @@ func (s *OpenAIGatewayService) ForwardAsAnthropic(
 	// saltCodexTurnMetadata is idempotent for fingerprint fields.
 	if rawMetadata := upstreamReq.Header.Get("x-codex-turn-metadata"); rawMetadata != "" {
 		isolatedSessionID := upstreamReq.Header.Get("session_id")
-		if salted := saltCodexTurnMetadata(rawMetadata, account, isolatedSessionID); salted != "" {
+		if persona, ok := codexFingerprintPersonaFromContext(c); ok {
+			if rewritten, rewriteErr := rewriteCodexTurnMetadata(rawMetadata, *persona, isolatedSessionID); rewriteErr == nil {
+				upstreamReq.Header.Set("x-codex-turn-metadata", rewritten)
+			} else {
+				return nil, fmt.Errorf("rewrite codex turn metadata: %w", rewriteErr)
+			}
+		} else if salted := saltCodexTurnMetadata(rawMetadata, account, isolatedSessionID); salted != "" {
 			upstreamReq.Header.Set("x-codex-turn-metadata", salted)
 		}
 	}

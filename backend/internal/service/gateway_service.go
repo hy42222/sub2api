@@ -464,6 +464,13 @@ type GatewayCache interface {
 	DeleteSessionAccountID(ctx context.Context, groupID int64, sessionHash string) error
 }
 
+// CodexFingerprintPoolCache is implemented by the shared gateway cache. It is
+// intentionally separate from GatewayCache so existing test doubles and other
+// gateway services do not need to know about Codex persona pooling.
+type CodexFingerprintPoolCache interface {
+	ResolveCodexFingerprintPersona(ctx context.Context, request CodexFingerprintPoolResolveRequest) (CodexFingerprintPersona, error)
+}
+
 // derefGroupID safely dereferences *int64 to int64, returning 0 if nil
 func derefGroupID(groupID *int64) int64 {
 	if groupID == nil {
