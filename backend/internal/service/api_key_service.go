@@ -762,7 +762,14 @@ func (s *APIKeyService) Update(ctx context.Context, id int64, userID int64, req 
 
 	if req.GroupID != nil {
 		// 验证分组权限
-		user, err := s.userRepo.GetByID(ctx, userID)
+		// userID=0 仅表示管理员绕过 Key 所有权校验，不是真实用户 ID。
+		// 普通更新路径仍按 Key 归属用户校验分组；管理员要强制调整分组时使用
+		// /admin/api-keys/:id，由该接口负责专属分组授权和订阅校验。
+		groupUserID := userID
+		if groupUserID == 0 {
+			groupUserID = apiKey.UserID
+		}
+		user, err := s.userRepo.GetByID(ctx, groupUserID)
 		if err != nil {
 			return nil, fmt.Errorf("get user: %w", err)
 		}

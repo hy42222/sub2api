@@ -10,7 +10,11 @@ const {
   getPublicSettings,
   getDashboardApiKeysUsage,
   getAvailableGroups,
+  getAllGroups,
   getUserGroupRates,
+  updateKey,
+  updateApiKeyGroup,
+  authState,
   showError,
   showSuccess,
   copyToClipboard,
@@ -21,7 +25,11 @@ const {
   getPublicSettings: vi.fn(),
   getDashboardApiKeysUsage: vi.fn(),
   getAvailableGroups: vi.fn(),
+  getAllGroups: vi.fn(),
   getUserGroupRates: vi.fn(),
+  updateKey: vi.fn(),
+  updateApiKeyGroup: vi.fn(),
+  authState: { isAdmin: false },
   showError: vi.fn(),
   showSuccess: vi.fn(),
   copyToClipboard: vi.fn(),
@@ -59,7 +67,7 @@ vi.mock('@/api', () => ({
   keysAPI: {
     list: listKeys,
     create: vi.fn(),
-    update: vi.fn(),
+    update: updateKey,
     delete: vi.fn(),
     toggleStatus: vi.fn(),
   },
@@ -73,6 +81,17 @@ vi.mock('@/api', () => ({
     getAvailable: getAvailableGroups,
     getUserGroupRates,
   },
+}))
+
+vi.mock('@/api/admin', () => ({
+  adminAPI: {
+    groups: { getAll: getAllGroups },
+    apiKeys: { updateApiKeyGroup },
+  },
+}))
+
+vi.mock('@/stores/auth', () => ({
+  useAuthStore: () => authState,
 }))
 
 vi.mock('@/stores/app', () => ({
@@ -170,6 +189,7 @@ const DataTableStub = {
           <slot name="cell-id" :value="row.id" :row="row" />
         </div>
         <slot name="cell-name" :value="row.name" :row="row" />
+        <slot name="cell-group" :value="row.group" :row="row" />
         <div data-test="current-concurrency">
           <slot name="cell-current_concurrency" :value="row.current_concurrency" :row="row" />
         </div>
@@ -215,6 +235,11 @@ const IconStub = {
   template: '<span data-test="icon">{{ name }}</span>',
 }
 
+const GroupOptionItemStub = {
+  props: ['name'],
+  template: '<span>{{ name }}</span>',
+}
+
 const mountView = async () => {
   const wrapper = mount(KeysView, {
     global: {
@@ -232,7 +257,7 @@ const mountView = async () => {
         UseKeyModal: true,
         EndpointPopover: true,
         GroupBadge: true,
-        GroupOptionItem: true,
+        GroupOptionItem: GroupOptionItemStub,
         Teleport: true,
       },
     },
@@ -264,7 +289,11 @@ describe('user KeysView column settings', () => {
     getPublicSettings.mockReset()
     getDashboardApiKeysUsage.mockReset()
     getAvailableGroups.mockReset()
+    getAllGroups.mockReset()
     getUserGroupRates.mockReset()
+    updateKey.mockReset()
+    updateApiKeyGroup.mockReset()
+    authState.isAdmin = false
     showError.mockReset()
     showSuccess.mockReset()
     copyToClipboard.mockReset()
@@ -281,6 +310,7 @@ describe('user KeysView column settings', () => {
     getPublicSettings.mockResolvedValue({})
     getDashboardApiKeysUsage.mockResolvedValue({ stats: {} })
     getAvailableGroups.mockResolvedValue([])
+    getAllGroups.mockResolvedValue([])
     getUserGroupRates.mockResolvedValue({})
     isCurrentStep.mockReturnValue(false)
   })
@@ -303,6 +333,27 @@ describe('user KeysView column settings', () => {
     expect(visibleColumnKeys(wrapper)).not.toContain('last_used_at')
     expect(visibleColumnKeys(wrapper)).not.toContain('last_used_ip')
     expect(visibleColumnKeys(wrapper)).not.toContain('id')
+  })
+
+  it('uses the admin group list and admin update endpoint for administrators', async () => {
+    authState.isAdmin = true
+    getAllGroups.mockResolvedValue([{ id: 42, name: 'VIP' }])
+    updateApiKeyGroup.mockResolvedValue({ api_key: createApiKey(), auto_granted_group_access: false })
+
+    const wrapper = await mountView()
+
+    expect(getAllGroups).toHaveBeenCalledOnce()
+    expect(getAvailableGroups).not.toHaveBeenCalled()
+
+    await wrapper.get('button[title="keys.clickToChangeGroup"]').trigger('click')
+    await flushPromises()
+    const groupButton = wrapper.findAll('button').find((button) => button.text().includes('VIP'))
+    expect(groupButton).toBeDefined()
+    await groupButton!.trigger('click')
+    await flushPromises()
+
+    expect(updateApiKeyGroup).toHaveBeenCalledWith(1, 42)
+    expect(updateKey).not.toHaveBeenCalled()
   })
 
   it('shows a hidden column when toggled and persists the preference', async () => {

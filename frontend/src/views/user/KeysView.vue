@@ -1120,12 +1120,14 @@
 	import { ref, reactive, computed, onMounted, onUnmounted, type ComponentPublicInstance } from 'vue'
 	import { useI18n } from 'vue-i18n'
 	import { useAppStore } from '@/stores/app'
+	import { useAuthStore } from '@/stores/auth'
 	import { useOnboardingStore } from '@/stores/onboarding'
 	import { useClipboard } from '@/composables/useClipboard'
 import { getPersistedPageSize } from '@/composables/usePersistedPageSize'
 
 const { t } = useI18n()
 import { keysAPI, authAPI, usageAPI, userGroupsAPI } from '@/api'
+import { adminAPI } from '@/api/admin'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import TablePageLayout from '@/components/layout/TablePageLayout.vue'
 	import DataTable from '@/components/common/DataTable.vue'
@@ -1172,6 +1174,7 @@ interface GroupOption {
 }
 
 const appStore = useAppStore()
+const authStore = useAuthStore()
 const onboardingStore = useOnboardingStore()
 const { copyToClipboard: clipboardCopy } = useClipboard()
 
@@ -1507,7 +1510,9 @@ const loadApiKeys = async () => {
 
 const loadGroups = async () => {
   try {
-    groups.value = await userGroupsAPI.getAvailable()
+    groups.value = authStore.isAdmin
+      ? await adminAPI.groups.getAll()
+      : await userGroupsAPI.getAvailable()
   } catch (error) {
     console.error('Failed to load groups:', error)
   }
@@ -1636,7 +1641,11 @@ const changeGroup = async (key: ApiKey, newGroupId: number | null) => {
   if (key.group_id === newGroupId) return
 
   try {
-    await keysAPI.update(key.id, { group_id: newGroupId })
+    if (authStore.isAdmin) {
+      await adminAPI.apiKeys.updateApiKeyGroup(key.id, newGroupId)
+    } else {
+      await keysAPI.update(key.id, { group_id: newGroupId })
+    }
     appStore.showSuccess(t('keys.groupChangedSuccess'))
     loadApiKeys()
   } catch (error) {
@@ -1720,7 +1729,6 @@ const handleSubmit = async () => {
     if (showEditModal.value && selectedKey.value) {
       const updates: UpdateApiKeyRequest = {
         name: formData.value.name,
-        group_id: formData.value.group_id,
         ip_whitelist: ipWhitelist,
         ip_blacklist: ipBlacklist,
         quota: quota,
@@ -1729,10 +1737,16 @@ const handleSubmit = async () => {
         rate_limit_1d: rateLimitData.rate_limit_1d,
         rate_limit_7d: rateLimitData.rate_limit_7d,
       }
+      if (!authStore.isAdmin) {
+        updates.group_id = formData.value.group_id
+      }
       if (shouldSubmitEditStatus(selectedKey.value, formData.value.status)) {
         updates.status = formData.value.status
       }
       await keysAPI.update(selectedKey.value.id, updates)
+      if (authStore.isAdmin && selectedKey.value.group_id !== formData.value.group_id) {
+        await adminAPI.apiKeys.updateApiKeyGroup(selectedKey.value.id, formData.value.group_id)
+      }
       appStore.showSuccess(t('keys.keyUpdatedSuccess'))
     } else {
       const customKey = formData.value.use_custom_key ? formData.value.custom_key : undefined
