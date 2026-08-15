@@ -214,7 +214,6 @@ func (s *OpsService) RefreshRuntimeSettings(ctx context.Context) error {
 		}
 	}
 	normalizeOpsAdvancedSettings(advanced)
-	applyWorkspaceFingerprintTimeoutSetting(advanced)
 
 	s.runtimeSettings.Store(&opsRuntimeSettingsSnapshot{monitoringEnabled: monitoringEnabled, advanced: *advanced})
 	return nil

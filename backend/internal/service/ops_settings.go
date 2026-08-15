@@ -369,17 +369,16 @@ func defaultOpsAdvancedSettings() *OpsAdvancedSettings {
 		Aggregation: OpsAggregationSettings{
 			AggregationEnabled: false,
 		},
-		OpenAIAccountQuotaAutoPause:        OpsOpenAIAccountQuotaAutoPauseSettings{},
-		IgnoreCountTokensErrors:            true,  // count_tokens 404 是预期行为，默认忽略
-		IgnoreContextCanceled:              true,  // Default to true - client disconnects are not errors
-		IgnoreNoAvailableAccounts:          false, // Default to false - this is a real routing issue
-		IgnoreInvalidApiKeyErrors:          true,  // Legacy compatibility field; admission rejects are always excluded.
-		IgnoreInsufficientBalanceErrors:    false, // 默认不忽略，余额不足可能需要关注
-		DisplayOpenAITokenStats:            false,
-		DisplayAlertEvents:                 true,
-		AutoRefreshEnabled:                 false,
-		AutoRefreshIntervalSec:             30,
-		WorkspaceFingerprintIdleTimeoutMin: 15,
+		OpenAIAccountQuotaAutoPause:     OpsOpenAIAccountQuotaAutoPauseSettings{},
+		IgnoreCountTokensErrors:         true,  // count_tokens 404 是预期行为，默认忽略
+		IgnoreContextCanceled:           true,  // Default to true - client disconnects are not errors
+		IgnoreNoAvailableAccounts:       false, // Default to false - this is a real routing issue
+		IgnoreInvalidApiKeyErrors:       true,  // Legacy compatibility field; admission rejects are always excluded.
+		IgnoreInsufficientBalanceErrors: false, // 默认不忽略，余额不足可能需要关注
+		DisplayOpenAITokenStats:         false,
+		DisplayAlertEvents:              true,
+		AutoRefreshEnabled:              false,
+		AutoRefreshIntervalSec:          30,
 	}
 }
 
@@ -409,9 +408,6 @@ func normalizeOpsAdvancedSettings(cfg *OpsAdvancedSettings) {
 		cfg.DataRetention.HourlyMetricsRetentionDays = 30
 	}
 	// Normalize auto refresh interval (default 30 seconds)
-	if cfg.WorkspaceFingerprintIdleTimeoutMin <= 0 {
-		cfg.WorkspaceFingerprintIdleTimeoutMin = 15
-	}
 	if cfg.AutoRefreshIntervalSec <= 0 {
 		cfg.AutoRefreshIntervalSec = 30
 	}
@@ -425,15 +421,6 @@ func clampOpsQuotaAutoPauseThreshold(value float64) float64 {
 		return 1
 	}
 	return value
-}
-
-// applyWorkspaceFingerprintTimeoutSetting pushes the workspace fingerprint idle
-// timeout from ops advanced settings to the global package variable.
-func applyWorkspaceFingerprintTimeoutSetting(cfg *OpsAdvancedSettings) {
-	if cfg == nil || cfg.WorkspaceFingerprintIdleTimeoutMin <= 0 {
-		return
-	}
-	WorkspaceFingerprintIdleTimeout = time.Duration(cfg.WorkspaceFingerprintIdleTimeoutMin) * time.Minute
 }
 
 func validateOpsAdvancedSettings(cfg *OpsAdvancedSettings) error {
@@ -489,7 +476,6 @@ func (s *OpsService) UpdateOpsAdvancedSettings(ctx context.Context, cfg *OpsAdva
 	}
 
 	normalizeOpsAdvancedSettings(cfg)
-	applyWorkspaceFingerprintTimeoutSetting(cfg)
 	raw, err := json.Marshal(cfg)
 	if err != nil {
 		return nil, err
