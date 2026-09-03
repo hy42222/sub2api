@@ -105,15 +105,14 @@ type antigravityUsageCache struct {
 }
 
 const (
-	apiCacheTTL             = 3 * time.Minute
-	apiErrorCacheTTL        = 1 * time.Minute        // 负缓存 TTL：429 等错误缓存 1 分钟
-	antigravityErrorTTL     = 1 * time.Minute        // Antigravity 错误缓存 TTL（可恢复错误）
-	apiQueryMaxJitter       = 800 * time.Millisecond // 用量查询最大随机延迟
-	windowStatsCacheTTL     = 1 * time.Minute
-	openAIProbeCacheTTL     = 10 * time.Minute
-	openAICodexProbeVersion = codexCLIVersion
-	grokProbeRetryTTL       = 1 * time.Minute
-	grokFreeQuotaWindow     = 24 * time.Hour
+	apiCacheTTL         = 3 * time.Minute
+	apiErrorCacheTTL    = 1 * time.Minute        // 负缓存 TTL：429 等错误缓存 1 分钟
+	antigravityErrorTTL = 1 * time.Minute        // Antigravity 错误缓存 TTL（可恢复错误）
+	apiQueryMaxJitter   = 800 * time.Millisecond // 用量查询最大随机延迟
+	windowStatsCacheTTL = 1 * time.Minute
+	openAIProbeCacheTTL = 10 * time.Minute
+	grokProbeRetryTTL   = 1 * time.Minute
+	grokFreeQuotaWindow = 24 * time.Hour
 )
 
 // UsageCache 封装账户使用量相关的缓存
@@ -504,6 +503,13 @@ func (s *AccountUsageService) GetUsage(ctx context.Context, accountID int64, for
 	return s.getUsageForAccount(ctx, account, forceProbe)
 }
 
+// GetUsageForAccount 已加载账号的使用量直通入口（配额监控 fetcher 复用，
+// 避免缓存未命中时账号被加载两次——每次 GetByID 含 proxies/groups 联查）。
+func (s *AccountUsageService) GetUsageForAccount(ctx context.Context, account *Account, force ...bool) (*UsageInfo, error) {
+	forceProbe := len(force) > 0 && force[0]
+	return s.getUsageForAccount(ctx, account, forceProbe)
+}
+
 // GetUsageBatch 批量获取账号使用量。
 // Anthropic OAuth/SetupToken 统一走 passive 链路，其他账号复用现有主动查询逻辑。
 // 单个账号失败不会中断整批请求，错误会按账号返回。
@@ -723,6 +729,9 @@ func (s *AccountUsageService) getOpenAIUsage(ctx context.Context, account *Accou
 					if updates := buildCodexSparkWindowExtraUpdates(quotaUsage, now); len(updates) > 0 {
 						mergeAccountExtra(account, updates)
 						s.persistOpenAICodexProbeSnapshot(account.ID, updates)
+						if account.ParentAccountID != nil {
+							notifyOpenAIAutoReset(*account.ParentAccountID)
+						}
 						if usage.UpdatedAt == nil {
 							usage.UpdatedAt = &now
 						}
@@ -830,7 +839,7 @@ func (s *AccountUsageService) probeOpenAICodexSnapshot(ctx context.Context, acco
 	if accessToken == "" && !account.IsOpenAIAgentIdentity() {
 		return nil, fmt.Errorf("no access token available")
 	}
-	modelID := openaipkg.DefaultTestModel
+	modelID := openaipkg.CodexUsageProbeModel
 	payload := createOpenAITestPayload(modelID, true)
 	payloadBytes, err := json.Marshal(payload)
 	if err != nil {
@@ -860,17 +869,19 @@ func (s *AccountUsageService) probeOpenAICodexSnapshot(ctx context.Context, acco
 	}
 	req.Header.Set("Accept", "text/event-stream")
 	req.Header.Set("OpenAI-Beta", "responses=experimental")
-	req.Header.Set("Originator", "codex_cli_rs")
-	req.Header.Set("Version", openAICodexProbeVersion)
-	req.Header.Set("User-Agent", codexCLIUserAgent)
+	canonical := resolveCodexOutboundIdentity("")
+	req.Header.Set("Originator", canonical.originator)
+	req.Header.Set("Version", canonical.version)
+	req.Header.Set("User-Agent", canonical.userAgent)
 	if s.identityCache != nil {
 		if fp, fpErr := s.identityCache.GetFingerprint(reqCtx, account.ID); fpErr == nil && fp != nil && strings.TrimSpace(fp.UserAgent) != "" {
 			req.Header.Set("User-Agent", strings.TrimSpace(fp.UserAgent))
 		}
 	}
-	// 与真实转发一致：originator 与最终 User-Agent（可能来自指纹缓存，如 codex-tui）首段配套，
-	// 否则探针被上游 404（issue #3901）。
-	enforceCodexIdentityHeaders(req.Header)
+	// 与真实转发一致：账号级自定义 UA 同样作为管理员显式配置传入。
+	// 上面写进 header 的指纹缓存 UA 只在强制统一被关闭时才参与配对（保持回滚后的历史语义）；
+	// 强制统一开启时客户端身份不参与构造，探针与真实转发用同一套规范身份出站。
+	enforceCodexIdentityHeadersWithUA(req.Header, account.GetOpenAIUserAgent())
 	setOpenAIChatGPTAccountHeaders(req.Header, account)
 
 	proxyURL := ""
@@ -913,7 +924,9 @@ func (s *AccountUsageService) persistOpenAICodexProbeSnapshot(accountID int64, u
 	go func() {
 		updateCtx, updateCancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer updateCancel()
-		_ = s.accountRepo.UpdateExtra(updateCtx, accountID, updates)
+		if err := s.accountRepo.UpdateExtra(updateCtx, accountID, updates); err == nil {
+			notifyOpenAIAutoReset(accountID)
+		}
 	}()
 }
 

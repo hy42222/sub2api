@@ -53,6 +53,9 @@ const (
 	CodexOAuthUserAgent = "codex-cli/" + CodexCLIVersion
 )
 
+// CodexUsageProbeModel is the model used for OAuth Codex usage probes.
+const CodexUsageProbeModel = "codex-auto-review"
+
 // DefaultInstructions default instructions for non-Codex CLI requests.
 // 内容为真实 Codex CLI 的 GPT-5-Codex base prompt（codex 系模型默认）。
 //
