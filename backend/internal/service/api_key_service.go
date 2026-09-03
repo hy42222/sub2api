@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"html"
 	"math"
@@ -44,12 +45,13 @@ var (
 )
 
 const (
-	MaxAPIKeyCredentialBytes     = 128
-	defaultAuthLookupConcurrency = 64
-	defaultNegativeAuthCacheSize = 16384
-	apiKeyMaxErrorsPerHour       = 20
-	apiKeyLastUsedMinTouch       = 30 * time.Second
-	apiKeySortCurrentConcurrency = "current_concurrency"
+	MaxAPIKeyCredentialBytes      = 128
+	defaultAuthLookupConcurrency  = 64
+	defaultNegativeAuthCacheSize  = 16384
+	apiKeyMaxErrorsPerHour        = 20
+	apiKeyRegenerationMaxAttempts = 5
+	apiKeyLastUsedMinTouch        = 30 * time.Second
+	apiKeySortCurrentConcurrency  = "current_concurrency"
 	// DB 写失败后的短退避，避免请求路径持续同步重试造成写风暴与高延迟。
 	apiKeyLastUsedFailBackoff = 5 * time.Second
 )
@@ -61,6 +63,7 @@ const (
 // 若编辑 Key 时无条件整行回写，并发累计的配额与限流计数就会被旧快照覆盖。
 // 因此调用方必须显式声明要改的列。
 type APIKeyUpdateFields struct {
+	Key       bool
 	Name      bool
 	Status    bool
 	Quota     bool
@@ -386,13 +389,59 @@ func (s *APIKeyService) GenerateKey() (string, error) {
 	}
 
 	// 转换为十六进制字符串并添加前缀
-	prefix := s.cfg.Default.APIKeyPrefix
+	prefix := "sk-"
+	if s != nil && s.cfg != nil {
+		prefix = s.cfg.Default.APIKeyPrefix
+	}
 	if prefix == "" {
 		prefix = "sk-"
 	}
 
 	key := prefix + hex.EncodeToString(bytes)
 	return key, nil
+}
+
+// RegenerateKey replaces one API key credential while preserving the record's
+// identity, configuration, usage and status. The database unique constraint
+// is the final collision check for the generated credential.
+func (s *APIKeyService) RegenerateKey(ctx context.Context, id int64, userID int64) (*APIKey, error) {
+	apiKey, err := s.apiKeyRepo.GetByID(ctx, id)
+	if err != nil {
+		return nil, fmt.Errorf("get api key: %w", err)
+	}
+	if apiKey == nil {
+		return nil, ErrAPIKeyNotFound
+	}
+
+	// userID=0 is reserved for an authenticated administrator, matching the
+	// existing update and delete paths.
+	if apiKey.UserID != userID && userID != 0 {
+		return nil, ErrInsufficientPerms
+	}
+
+	oldKey := apiKey.Key
+	for attempt := 0; attempt < apiKeyRegenerationMaxAttempts; attempt++ {
+		newKey, err := s.GenerateKey()
+		if err != nil {
+			return nil, fmt.Errorf("generate api key: %w", err)
+		}
+
+		apiKey.Key = newKey
+		if err := s.apiKeyRepo.Update(ctx, apiKey, APIKeyUpdateFields{Key: true}); err != nil {
+			if errors.Is(err, ErrAPIKeyExists) {
+				continue
+			}
+			return nil, fmt.Errorf("regenerate api key: %w", err)
+		}
+
+		// The old credential must stop authenticating immediately. Clearing the
+		// new credential also removes any stale negative cache entry.
+		s.InvalidateAuthCacheByKey(ctx, oldKey)
+		s.InvalidateAuthCacheByKey(ctx, newKey)
+		return apiKey, nil
+	}
+
+	return nil, ErrAPIKeyExists
 }
 
 // ValidateCustomKey 验证自定义API Key格式

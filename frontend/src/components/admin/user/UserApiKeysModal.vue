@@ -77,6 +77,15 @@
               <button class="icon-btn" type="button" :title="t('keys.editKey')" @click="startEdit(key)">
                 <Icon name="edit" size="sm" />
               </button>
+              <button
+                class="icon-btn text-amber-600 hover:bg-amber-50 dark:text-amber-400 dark:hover:bg-amber-900/20"
+                type="button"
+                :title="t('keys.regenerateKey')"
+                :disabled="regeneratingKeyId === key.id"
+                @click="regeneratingKey = key"
+              >
+                <Icon name="refresh" size="sm" :class="regeneratingKeyId === key.id ? 'animate-spin' : ''" />
+              </button>
               <button class="icon-btn text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20" type="button" :title="t('keys.deleteKey')" @click="deletingKey = key">
                 <Icon name="trash" size="sm" />
               </button>
@@ -178,6 +187,17 @@
     @confirm="confirmDelete"
     @cancel="deletingKey = null"
   />
+
+  <ConfirmDialog
+    :show="regeneratingKey !== null"
+    :title="t('keys.regenerateKey')"
+    :message="t('keys.regenerateKeyConfirmMessage', { name: regeneratingKey?.name || '' })"
+    :confirm-text="t('keys.regenerateKey')"
+    :cancel-text="t('common.cancel')"
+    :danger="true"
+    @confirm="confirmRegenerate"
+    @cancel="regeneratingKey = null"
+  />
 </template>
 
 <script setup lang="ts">
@@ -204,6 +224,8 @@ const loading = ref(false)
 const saving = ref(false)
 const editingKey = ref<ApiKey | null>(null)
 const deletingKey = ref<ApiKey | null>(null)
+const regeneratingKey = ref<ApiKey | null>(null)
+const regeneratingKeyId = ref<number | null>(null)
 const updatingKeyIds = ref(new Set<number>())
 const groupSelectorKeyId = ref<number | null>(null)
 const dropdownPosition = ref<{ top: number; left: number } | null>(null)
@@ -399,6 +421,24 @@ const confirmDelete = async () => {
   }
 }
 
+const confirmRegenerate = async () => {
+  const key = regeneratingKey.value
+  if (!key) return
+
+  regeneratingKey.value = null
+  regeneratingKeyId.value = key.id
+  try {
+    const regenerated = await adminAPI.apiKeys.regenerateApiKey(key.id)
+    const index = apiKeys.value.findIndex((item) => item.id === key.id)
+    if (index !== -1) apiKeys.value[index] = regenerated
+    appStore.showSuccess(t('keys.keyRegeneratedSuccess'))
+  } catch (error: any) {
+    appStore.showError(error?.message || t('keys.failedToRegenerate'))
+  } finally {
+    regeneratingKeyId.value = null
+  }
+}
+
 const handleKeyDown = (event: KeyboardEvent) => {
   if (event.key === 'Escape' && groupSelectorKeyId.value !== null) {
     event.stopPropagation()
@@ -421,6 +461,8 @@ const handleClose = () => {
   closeGroupSelector()
   cancelEdit()
   deletingKey.value = null
+  regeneratingKey.value = null
+  regeneratingKeyId.value = null
   emit('close')
 }
 

@@ -150,6 +150,26 @@ func (s *APIKeyRepoSuite) TestUpdate() {
 	s.Require().Equal(service.StatusDisabled, got.Status)
 }
 
+func (s *APIKeyRepoSuite) TestUpdate_KeyOnly() {
+	user := s.mustCreateUser("update-key-only@test.com")
+	key := &service.APIKey{
+		UserID: user.ID,
+		Key:    "sk-update-key-old",
+		Name:   "Key-only update",
+		Status: service.StatusActive,
+	}
+	s.Require().NoError(s.repo.Create(s.ctx, key))
+
+	key.Key = "sk-update-key-new"
+	s.Require().NoError(s.repo.Update(s.ctx, key, service.APIKeyUpdateFields{Key: true}), "Update key")
+
+	_, err := s.repo.GetByKey(s.ctx, "sk-update-key-old")
+	s.Require().ErrorIs(err, service.ErrAPIKeyNotFound)
+	got, err := s.repo.GetByKey(s.ctx, "sk-update-key-new")
+	s.Require().NoError(err)
+	s.Require().Equal(key.ID, got.ID)
+}
+
 func (s *APIKeyRepoSuite) TestUpdate_ClearGroupID() {
 	user := s.mustCreateUser("cleargroup@test.com")
 	group := s.mustCreateGroup("g-clear")

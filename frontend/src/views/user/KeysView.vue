@@ -410,6 +410,16 @@
                 <Icon name="edit" size="sm" />
                 <span class="text-xs">{{ t('common.edit') }}</span>
               </button>
+              <!-- Regenerate Key Button -->
+              <button
+                @click="confirmRegenerate(row)"
+                :disabled="regeneratingKeyId === row.id"
+                class="flex flex-col items-center gap-0.5 rounded-lg p-1.5 text-gray-500 transition-colors hover:bg-amber-50 hover:text-amber-600 disabled:cursor-not-allowed disabled:opacity-50 dark:hover:bg-amber-900/20 dark:hover:text-amber-400"
+                :title="t('keys.regenerateKey')"
+              >
+                <Icon name="refresh" size="sm" :class="regeneratingKeyId === row.id ? 'animate-spin' : ''" />
+                <span class="text-xs">{{ t('keys.regenerateKey') }}</span>
+              </button>
               <!-- Delete Button -->
               <button
                 @click="confirmDelete(row)"
@@ -964,6 +974,18 @@
       @cancel="showDeleteDialog = false"
     />
 
+    <!-- Regenerate Confirmation Dialog -->
+    <ConfirmDialog
+      :show="showRegenerateDialog"
+      :title="t('keys.regenerateKey')"
+      :message="t('keys.regenerateKeyConfirmMessage', { name: selectedKey?.name })"
+      :confirm-text="t('keys.regenerateKey')"
+      :cancel-text="t('common.cancel')"
+      :danger="true"
+      @confirm="handleRegenerate"
+      @cancel="showRegenerateDialog = false"
+    />
+
     <!-- Reset Quota Confirmation Dialog -->
     <ConfirmDialog
       :show="showResetQuotaDialog"
@@ -1300,6 +1322,7 @@ const filterGroupId = ref<string | number>('')
 const showCreateModal = ref(false)
 const showEditModal = ref(false)
 const showDeleteDialog = ref(false)
+const showRegenerateDialog = ref(false)
 const showResetQuotaDialog = ref(false)
 const showResetRateLimitDialog = ref(false)
 const showUseKeyModal = ref(false)
@@ -1307,6 +1330,7 @@ const showCcsClientSelect = ref(false)
 const showColumnDropdown = ref(false)
 const pendingCcsRow = ref<ApiKey | null>(null)
 const selectedKey = ref<ApiKey | null>(null)
+const regeneratingKeyId = ref<number | null>(null)
 const copiedKeyId = ref<number | null>(null)
 const groupSelectorKeyId = ref<number | null>(null)
 const publicSettings = ref<PublicSettings | null>(null)
@@ -1598,6 +1622,31 @@ const toggleKeyStatus = async (key: ApiKey) => {
     loadApiKeys()
   } catch (error) {
     appStore.showError(t('keys.failedToUpdateStatus'))
+  }
+}
+
+const confirmRegenerate = (key: ApiKey) => {
+  groupSelectorKeyId.value = null
+  dropdownPosition.value = null
+  selectedKey.value = key
+  showRegenerateDialog.value = true
+}
+
+const handleRegenerate = async () => {
+  const key = selectedKey.value
+  if (!key) return
+
+  showRegenerateDialog.value = false
+  regeneratingKeyId.value = key.id
+  try {
+    const regenerated = await keysAPI.regenerate(key.id)
+    const index = apiKeys.value.findIndex((item) => item.id === key.id)
+    if (index !== -1) apiKeys.value[index] = regenerated
+    appStore.showSuccess(t('keys.keyRegeneratedSuccess'))
+  } catch (error: any) {
+    appStore.showError(error?.message || t('keys.failedToRegenerate'))
+  } finally {
+    regeneratingKeyId.value = null
   }
 }
 

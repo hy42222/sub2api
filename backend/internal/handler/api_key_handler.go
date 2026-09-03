@@ -303,6 +303,38 @@ func (h *APIKeyHandler) Update(c *gin.Context) {
 	response.Success(c, dto.APIKeyFromService(key))
 }
 
+// Regenerate replaces an API key's credential while preserving its settings.
+// POST /api/v1/keys/:id/regenerate
+func (h *APIKeyHandler) Regenerate(c *gin.Context) {
+	subject, ok := middleware2.GetAuthSubjectFromContext(c)
+	if !ok {
+		response.Unauthorized(c, "User not authenticated")
+		return
+	}
+
+	keyID, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil {
+		response.BadRequest(c, "Invalid key ID")
+		return
+	}
+
+	// 管理员可轮换任意 Key，传 userID=0 跳过所有权校验。
+	uid := subject.UserID
+	if role, ok := middleware2.GetUserRoleFromContext(c); ok && role == "admin" {
+		uid = 0
+	}
+
+	executeUserIdempotentJSON(c, "user.api_keys.regenerate", struct {
+		KeyID int64 `json:"key_id"`
+	}{KeyID: keyID}, service.DefaultWriteIdempotencyTTL(), func(ctx context.Context) (any, error) {
+		key, err := h.apiKeyService.RegenerateKey(ctx, keyID, uid)
+		if err != nil {
+			return nil, err
+		}
+		return dto.APIKeyFromService(key), nil
+	})
+}
+
 // Delete handles deleting an API key
 // DELETE /api/v1/api-keys/:id
 func (h *APIKeyHandler) Delete(c *gin.Context) {

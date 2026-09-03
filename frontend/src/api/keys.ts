@@ -111,6 +111,75 @@ export async function update(id: number, updates: UpdateApiKeyRequest): Promise<
   return data
 }
 
+const regenerateOperationKeys = new Map<string, string>()
+
+function getCurrentUserID(): string | null {
+  try {
+    const rawUser = globalThis.localStorage?.getItem('auth_user')
+    if (!rawUser) return null
+
+    const user: unknown = JSON.parse(rawUser)
+    if (typeof user !== 'object' || user === null) return null
+
+    const id = (user as { id?: unknown }).id
+    if (typeof id !== 'number' || !Number.isSafeInteger(id) || id <= 0) return null
+    return String(id)
+  } catch {
+    return null
+  }
+}
+
+function regenerateOperationStorageKey(id: number): string | null {
+  const userID = getCurrentUserID()
+  return userID ? `sub2api:api-key-regenerate:${userID}:${id}` : null
+}
+
+function getStoredRegenerateOperationKey(storageKey: string): string | null {
+  try {
+    return globalThis.sessionStorage?.getItem(storageKey) ?? null
+  } catch {
+    return null
+  }
+}
+
+function storeRegenerateOperationKey(storageKey: string, key: string | null): void {
+  try {
+    if (key) globalThis.sessionStorage?.setItem(storageKey, key)
+    else globalThis.sessionStorage?.removeItem(storageKey)
+  } catch {
+    // In-memory retry protection still works when browser storage is unavailable.
+  }
+}
+
+/**
+ * Regenerate one API key. Keep the operation key after an ambiguous failure
+ * so a retry replays the rotation instead of rotating twice.
+ */
+export async function regenerate(id: number): Promise<ApiKey> {
+  const storageKey = regenerateOperationStorageKey(id)
+  let idempotencyKey = storageKey
+    ? regenerateOperationKeys.get(storageKey) ?? getStoredRegenerateOperationKey(storageKey)
+    : null
+  if (!idempotencyKey) {
+    const requestID = globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`
+    idempotencyKey = `api-key-regenerate-${id}-${requestID}`
+  }
+  if (storageKey) {
+    regenerateOperationKeys.set(storageKey, idempotencyKey)
+    storeRegenerateOperationKey(storageKey, idempotencyKey)
+  }
+
+  const { data } = await apiClient.post<ApiKey>(`/keys/${id}/regenerate`, undefined, {
+    headers: { 'Idempotency-Key': idempotencyKey }
+  })
+
+  if (storageKey) {
+    regenerateOperationKeys.delete(storageKey)
+    storeRegenerateOperationKey(storageKey, null)
+  }
+  return data
+}
+
 /**
  * Delete API key
  * @param id - API key ID
@@ -136,6 +205,7 @@ export const keysAPI = {
   getById,
   create,
   update,
+  regenerate,
   delete: deleteKey,
   toggleStatus
 }
