@@ -438,6 +438,18 @@ const routes: RouteRecordRaw[] = [
     }
   },
   {
+    path: '/admin/key-ip-audit',
+    name: 'AdminKeyIpAudit',
+    component: () => import('@/views/admin/KeyIpAuditView.vue'),
+    meta: {
+      requiresAuth: true,
+      requiresAdmin: true,
+      title: 'Key / IP Audit',
+      titleKey: 'admin.keyIpAudit.title',
+      descriptionKey: 'admin.keyIpAudit.description'
+    }
+  },
+  {
     path: '/admin/users',
     name: 'AdminUsers',
     component: () => import('@/views/admin/UsersView.vue'),

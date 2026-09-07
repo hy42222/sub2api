@@ -130,7 +130,21 @@ func RegisterAdminRoutes(
 
 		// 操作审计日志
 		registerAuditLogRoutes(admin, h, stepUpAuth)
+		registerKeyIPAuditRoutes(admin, h)
 	}
+}
+
+func registerKeyIPAuditRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
+	audit := admin.Group("/key-ip-audit")
+	audit.GET("/keys", h.Admin.KeyIPAudit.ListKeys)
+	audit.GET("/keys/:id", h.Admin.KeyIPAudit.KeyDetail)
+	audit.POST("/keys/:id/disable", h.Admin.KeyIPAudit.DisableKey)
+	audit.POST("/keys/:id/rotate", h.Admin.KeyIPAudit.RotateKey)
+	audit.GET("/trusted", h.Admin.KeyIPAudit.ListTrusted)
+	audit.POST("/trusted", h.Admin.KeyIPAudit.CreateTrusted)
+	audit.DELETE("/trusted/:id", h.Admin.KeyIPAudit.DeleteTrusted)
+	audit.POST("/dismissals", h.Admin.KeyIPAudit.CreateDismissal)
+	audit.DELETE("/dismissals/:id", h.Admin.KeyIPAudit.DeleteDismissal)
 }
 
 func registerPromptAuditRoutes(admin *gin.RouterGroup, h *handler.Handlers) {

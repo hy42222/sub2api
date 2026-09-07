@@ -317,10 +317,22 @@ const getNumericQueryValue = (value: string | null | Array<string | null> | unde
   return Number.isFinite(parsed) ? parsed : undefined
 }
 
+const getRouteDateValue = (value: string | undefined): string | undefined => {
+  if (!value) return undefined
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value
+  const parsed = new Date(value)
+  return Number.isNaN(parsed.getTime()) ? undefined : formatLD(parsed)
+}
+
 const applyRouteQueryFilters = () => {
-  const queryStartDate = getSingleQueryValue(route.query.start_date)
-  const queryEndDate = getSingleQueryValue(route.query.end_date)
+  const queryStartDate = getRouteDateValue(
+    getSingleQueryValue(route.query.start_date) ?? getSingleQueryValue(route.query.from)
+  )
+  const queryEndDate = getRouteDateValue(
+    getSingleQueryValue(route.query.end_date) ?? getSingleQueryValue(route.query.to)
+  )
   const queryUserId = getNumericQueryValue(route.query.user_id)
+  const queryApiKeyId = getNumericQueryValue(route.query.api_key_id) ?? getNumericQueryValue(route.query.key_id)
 
   if (queryStartDate) {
     startDate.value = queryStartDate
@@ -332,6 +344,7 @@ const applyRouteQueryFilters = () => {
   filters.value = {
     ...filters.value,
     user_id: queryUserId,
+    api_key_id: queryApiKeyId,
     start_date: startDate.value,
     end_date: endDate.value
   }
