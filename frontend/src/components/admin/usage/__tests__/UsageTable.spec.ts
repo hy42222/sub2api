@@ -9,8 +9,13 @@ const appStoreMocks = vi.hoisted(() => ({
   showError: vi.fn(),
 }))
 
+const adminUsageMocks = vi.hoisted(() => ({
+  getCodexTurnState: vi.fn(),
+}))
+
 vi.mock('@/utils/ipGeoLookup', () => ipGeoMocks)
 vi.mock('@/stores/app', () => ({ useAppStore: () => appStoreMocks }))
+vi.mock('@/api/admin/usage', () => ({ adminUsageAPI: adminUsageMocks }))
 
 import { describe, expect, it, vi, beforeEach } from 'vitest'
 import { mount } from '@vue/test-utils'
@@ -66,6 +71,16 @@ const messages: Record<string, string> = {
 	'keys.copied': 'Copied',
 	'keys.copyToClipboard': 'Copy to clipboard',
 	'common.copyFailed': 'Copy failed',
+	'admin.usage.codexTurnStateLength': 'X-Codex-Turn-State length',
+	'admin.usage.codexTurnState.title': 'X-Codex-Turn-State',
+	'admin.usage.codexTurnState.viewDetails': 'View X-Codex-Turn-State',
+	'admin.usage.codexTurnState.loading': 'Loading X-Codex-Turn-State...',
+	'admin.usage.codexTurnState.loadFailed': 'Failed to load X-Codex-Turn-State',
+	'admin.usage.codexTurnState.retry': 'Retry',
+	'admin.usage.codexTurnState.length': 'Length',
+	'admin.usage.codexTurnState.copy': 'Copy value',
+	'admin.usage.codexTurnState.copied': 'Value copied',
+	'common.close': 'Close',
 	'usage.requestedModel': 'Requested',
 	'usage.sentUpstreamModel': 'Sent upstream',
 	'usage.upstreamResponseModel': 'Upstream response',
@@ -95,6 +110,7 @@ const DataTableStub = {
         <slot name="cell-cost" :row="row" />
         <slot name="cell-request_id" :row="row" />
         <slot name="cell-upstream_request_id" :row="row" />
+        <slot name="cell-codex_turn_state_length" :row="row" />
       </div>
     </div>
   `,
@@ -665,6 +681,81 @@ describe('admin UsageTable request ID column', () => {
 
     expect(writeText).toHaveBeenCalledWith('20260903082826779695')
     expect(appStoreMocks.showSuccess).toHaveBeenCalledWith('Upstream ID copied')
+  })
+})
+
+describe('admin UsageTable Codex turn state column', () => {
+  beforeEach(() => {
+    adminUsageMocks.getCodexTurnState.mockReset()
+    appStoreMocks.showSuccess.mockReset()
+    appStoreMocks.showError.mockReset()
+  })
+
+  const mountCodexTable = (length: number | null) => mount(UsageTable, {
+    props: {
+      data: [{ ...baseImageRow, id: 42, codex_turn_state_length: length }],
+      loading: false,
+      columns: [{ key: 'codex_turn_state_length', label: 'X-Codex-Turn-State length' }],
+    },
+    global: {
+      stubs: {
+        DataTable: DataTableStub,
+        BaseDialog: {
+          props: ['show', 'title'],
+          template: '<div v-if="show" data-testid="codex-turn-state-dialog"><slot /><slot name="footer" /></div>',
+        },
+        EmptyState: true,
+        Icon: true,
+        Teleport: true,
+      },
+    },
+  })
+
+  it.each([null, 0])('shows a placeholder and does not make the length clickable when no value exists (%s)', (length) => {
+    const wrapper = mountCodexTable(length)
+
+    expect(wrapper.text()).toContain('-')
+    expect(wrapper.find('[data-testid="codex-turn-state-detail"]').exists()).toBe(false)
+    expect(adminUsageMocks.getCodexTurnState).not.toHaveBeenCalled()
+  })
+
+  it('loads the full value only after the length is clicked and supports copying it', async () => {
+    adminUsageMocks.getCodexTurnState.mockResolvedValue({
+      codex_turn_state: 'state-value-that-stays-in-the-modal',
+      codex_turn_state_length: 34,
+    })
+    const writeText = vi.fn().mockResolvedValue(undefined)
+    vi.stubGlobal('navigator', { clipboard: { writeText } })
+    const wrapper = mountCodexTable(34)
+
+    expect(adminUsageMocks.getCodexTurnState).not.toHaveBeenCalled()
+    await wrapper.get('[data-testid="codex-turn-state-detail"]').trigger('click')
+    expect(adminUsageMocks.getCodexTurnState).toHaveBeenCalledWith(42, expect.objectContaining({ signal: expect.any(AbortSignal) }))
+    await nextTick()
+
+    expect(wrapper.get('[data-testid="codex-turn-state-value"]').text()).toBe('state-value-that-stays-in-the-modal')
+    const copyButton = wrapper.findAll('button').find(button => button.text().includes('Copy value'))
+    expect(copyButton).toBeDefined()
+    await copyButton!.trigger('click')
+    expect(writeText).toHaveBeenCalledWith('state-value-that-stays-in-the-modal')
+    expect(appStoreMocks.showSuccess).toHaveBeenCalledWith('Value copied')
+  })
+
+  it('renders a retry action when the detail request fails', async () => {
+    adminUsageMocks.getCodexTurnState
+      .mockRejectedValueOnce(new Error('request failed'))
+      .mockResolvedValueOnce({ codex_turn_state: 'recovered', codex_turn_state_length: 9 })
+    const wrapper = mountCodexTable(9)
+
+    await wrapper.get('[data-testid="codex-turn-state-detail"]').trigger('click')
+    await nextTick()
+    expect(wrapper.text()).toContain('Failed to load X-Codex-Turn-State')
+
+    const retryButton = wrapper.findAll('button').find(button => button.text() === 'Retry')
+    expect(retryButton).toBeDefined()
+    await retryButton!.trigger('click')
+    await nextTick()
+    expect(adminUsageMocks.getCodexTurnState).toHaveBeenCalledTimes(2)
   })
 })
 

@@ -51,6 +51,20 @@ func (_c *UsageLogCreate) SetRequestID(v string) *UsageLogCreate {
 	return _c
 }
 
+// SetCodexTurnState sets the "codex_turn_state" field.
+func (_c *UsageLogCreate) SetCodexTurnState(v string) *UsageLogCreate {
+	_c.mutation.SetCodexTurnState(v)
+	return _c
+}
+
+// SetNillableCodexTurnState sets the "codex_turn_state" field if the given value is not nil.
+func (_c *UsageLogCreate) SetNillableCodexTurnState(v *string) *UsageLogCreate {
+	if v != nil {
+		_c.SetCodexTurnState(*v)
+	}
+	return _c
+}
+
 // SetModel sets the "model" field.
 func (_c *UsageLogCreate) SetModel(v string) *UsageLogCreate {
 	_c.mutation.SetModel(v)
@@ -971,6 +985,10 @@ func (_c *UsageLogCreate) createSpec() (*UsageLog, *sqlgraph.CreateSpec) {
 		_spec.SetField(usagelog.FieldRequestID, field.TypeString, value)
 		_node.RequestID = value
 	}
+	if value, ok := _c.mutation.CodexTurnState(); ok {
+		_spec.SetField(usagelog.FieldCodexTurnState, field.TypeString, value)
+		_node.CodexTurnState = &value
+	}
 	if value, ok := _c.mutation.Model(); ok {
 		_spec.SetField(usagelog.FieldModel, field.TypeString, value)
 		_node.Model = value
@@ -1317,6 +1335,24 @@ func (u *UsageLogUpsert) SetRequestID(v string) *UsageLogUpsert {
 // UpdateRequestID sets the "request_id" field to the value that was provided on create.
 func (u *UsageLogUpsert) UpdateRequestID() *UsageLogUpsert {
 	u.SetExcluded(usagelog.FieldRequestID)
+	return u
+}
+
+// SetCodexTurnState sets the "codex_turn_state" field.
+func (u *UsageLogUpsert) SetCodexTurnState(v string) *UsageLogUpsert {
+	u.Set(usagelog.FieldCodexTurnState, v)
+	return u
+}
+
+// UpdateCodexTurnState sets the "codex_turn_state" field to the value that was provided on create.
+func (u *UsageLogUpsert) UpdateCodexTurnState() *UsageLogUpsert {
+	u.SetExcluded(usagelog.FieldCodexTurnState)
+	return u
+}
+
+// ClearCodexTurnState clears the value of the "codex_turn_state" field.
+func (u *UsageLogUpsert) ClearCodexTurnState() *UsageLogUpsert {
+	u.SetNull(usagelog.FieldCodexTurnState)
 	return u
 }
 
@@ -2180,6 +2216,27 @@ func (u *UsageLogUpsertOne) SetRequestID(v string) *UsageLogUpsertOne {
 func (u *UsageLogUpsertOne) UpdateRequestID() *UsageLogUpsertOne {
 	return u.Update(func(s *UsageLogUpsert) {
 		s.UpdateRequestID()
+	})
+}
+
+// SetCodexTurnState sets the "codex_turn_state" field.
+func (u *UsageLogUpsertOne) SetCodexTurnState(v string) *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.SetCodexTurnState(v)
+	})
+}
+
+// UpdateCodexTurnState sets the "codex_turn_state" field to the value that was provided on create.
+func (u *UsageLogUpsertOne) UpdateCodexTurnState() *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.UpdateCodexTurnState()
+	})
+}
+
+// ClearCodexTurnState clears the value of the "codex_turn_state" field.
+func (u *UsageLogUpsertOne) ClearCodexTurnState() *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.ClearCodexTurnState()
 	})
 }
 
@@ -3336,6 +3393,27 @@ func (u *UsageLogUpsertBulk) SetRequestID(v string) *UsageLogUpsertBulk {
 func (u *UsageLogUpsertBulk) UpdateRequestID() *UsageLogUpsertBulk {
 	return u.Update(func(s *UsageLogUpsert) {
 		s.UpdateRequestID()
+	})
+}
+
+// SetCodexTurnState sets the "codex_turn_state" field.
+func (u *UsageLogUpsertBulk) SetCodexTurnState(v string) *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.SetCodexTurnState(v)
+	})
+}
+
+// UpdateCodexTurnState sets the "codex_turn_state" field to the value that was provided on create.
+func (u *UsageLogUpsertBulk) UpdateCodexTurnState() *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.UpdateCodexTurnState()
+	})
+}
+
+// ClearCodexTurnState clears the value of the "codex_turn_state" field.
+func (u *UsageLogUpsertBulk) ClearCodexTurnState() *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.ClearCodexTurnState()
 	})
 }
 

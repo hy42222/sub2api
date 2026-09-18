@@ -220,6 +220,35 @@ func (h *UsageHandler) List(c *gin.Context) {
 	response.Paginated(c, out, result.Total, page, pageSize)
 }
 
+// GetCodexTurnState returns the complete X-Codex-Turn-State for one usage log.
+// GET /api/v1/admin/usage/:id/codex-turn-state
+func (h *UsageHandler) GetCodexTurnState(c *gin.Context) {
+	c.Header("Cache-Control", "no-store")
+
+	usageID, err := strconv.ParseInt(strings.TrimSpace(c.Param("id")), 10, 64)
+	if err != nil || usageID <= 0 {
+		response.BadRequest(c, "Invalid usage ID")
+		return
+	}
+	if h.usageService == nil {
+		response.InternalError(c, "Usage service not available")
+		return
+	}
+
+	record, err := h.usageService.GetByID(c.Request.Context(), usageID)
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	detail := dto.AdminCodexTurnStateFromService(record)
+	if detail == nil {
+		response.NotFound(c, "Codex turn state not found")
+		return
+	}
+
+	response.Success(c, detail)
+}
+
 // Stats handles getting usage statistics with filters
 // GET /api/v1/admin/usage/stats
 func (h *UsageHandler) Stats(c *gin.Context) {

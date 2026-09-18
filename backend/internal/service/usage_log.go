@@ -143,6 +143,9 @@ type UsageLog struct {
 	InboundEndpoint *string
 	// UpstreamEndpoint is the normalized upstream endpoint path, e.g. /v1/responses.
 	UpstreamEndpoint *string
+	// CodexTurnState is the opaque X-Codex-Turn-State value sent to the upstream
+	// Codex account for this request. Historical and non-Codex rows are nil.
+	CodexTurnState *string
 
 	GroupID        *int64
 	SubscriptionID *int64

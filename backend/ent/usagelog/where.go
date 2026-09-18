@@ -75,6 +75,11 @@ func RequestID(v string) predicate.UsageLog {
 	return predicate.UsageLog(sql.FieldEQ(FieldRequestID, v))
 }
 
+// CodexTurnState applies equality check predicate on the "codex_turn_state" field. It's identical to CodexTurnStateEQ.
+func CodexTurnState(v string) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldEQ(FieldCodexTurnState, v))
+}
+
 // Model applies equality check predicate on the "model" field. It's identical to ModelEQ.
 func Model(v string) predicate.UsageLog {
 	return predicate.UsageLog(sql.FieldEQ(FieldModel, v))
@@ -408,6 +413,81 @@ func RequestIDEqualFold(v string) predicate.UsageLog {
 // RequestIDContainsFold applies the ContainsFold predicate on the "request_id" field.
 func RequestIDContainsFold(v string) predicate.UsageLog {
 	return predicate.UsageLog(sql.FieldContainsFold(FieldRequestID, v))
+}
+
+// CodexTurnStateEQ applies the EQ predicate on the "codex_turn_state" field.
+func CodexTurnStateEQ(v string) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldEQ(FieldCodexTurnState, v))
+}
+
+// CodexTurnStateNEQ applies the NEQ predicate on the "codex_turn_state" field.
+func CodexTurnStateNEQ(v string) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldNEQ(FieldCodexTurnState, v))
+}
+
+// CodexTurnStateIn applies the In predicate on the "codex_turn_state" field.
+func CodexTurnStateIn(vs ...string) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldIn(FieldCodexTurnState, vs...))
+}
+
+// CodexTurnStateNotIn applies the NotIn predicate on the "codex_turn_state" field.
+func CodexTurnStateNotIn(vs ...string) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldNotIn(FieldCodexTurnState, vs...))
+}
+
+// CodexTurnStateGT applies the GT predicate on the "codex_turn_state" field.
+func CodexTurnStateGT(v string) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldGT(FieldCodexTurnState, v))
+}
+
+// CodexTurnStateGTE applies the GTE predicate on the "codex_turn_state" field.
+func CodexTurnStateGTE(v string) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldGTE(FieldCodexTurnState, v))
+}
+
+// CodexTurnStateLT applies the LT predicate on the "codex_turn_state" field.
+func CodexTurnStateLT(v string) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldLT(FieldCodexTurnState, v))
+}
+
+// CodexTurnStateLTE applies the LTE predicate on the "codex_turn_state" field.
+func CodexTurnStateLTE(v string) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldLTE(FieldCodexTurnState, v))
+}
+
+// CodexTurnStateContains applies the Contains predicate on the "codex_turn_state" field.
+func CodexTurnStateContains(v string) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldContains(FieldCodexTurnState, v))
+}
+
+// CodexTurnStateHasPrefix applies the HasPrefix predicate on the "codex_turn_state" field.
+func CodexTurnStateHasPrefix(v string) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldHasPrefix(FieldCodexTurnState, v))
+}
+
+// CodexTurnStateHasSuffix applies the HasSuffix predicate on the "codex_turn_state" field.
+func CodexTurnStateHasSuffix(v string) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldHasSuffix(FieldCodexTurnState, v))
+}
+
+// CodexTurnStateIsNil applies the IsNil predicate on the "codex_turn_state" field.
+func CodexTurnStateIsNil() predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldIsNull(FieldCodexTurnState))
+}
+
+// CodexTurnStateNotNil applies the NotNil predicate on the "codex_turn_state" field.
+func CodexTurnStateNotNil() predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldNotNull(FieldCodexTurnState))
+}
+
+// CodexTurnStateEqualFold applies the EqualFold predicate on the "codex_turn_state" field.
+func CodexTurnStateEqualFold(v string) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldEqualFold(FieldCodexTurnState, v))
+}
+
+// CodexTurnStateContainsFold applies the ContainsFold predicate on the "codex_turn_state" field.
+func CodexTurnStateContainsFold(v string) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldContainsFold(FieldCodexTurnState, v))
 }
 
 // ModelEQ applies the EQ predicate on the "model" field.

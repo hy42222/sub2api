@@ -420,6 +420,7 @@ func (s *OpenAIGatewayService) forwardOpenAIWSV2(
 		return &OpenAIForwardResult{
 			RequestID:                     responseID,
 			ResponseID:                    responseID,
+			CodexTurnState:                turnState,
 			Usage:                         *usage,
 			Model:                         originalModel,
 			UpstreamModel:                 mappedModel,

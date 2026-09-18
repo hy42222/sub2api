@@ -88,6 +88,26 @@ func (_u *UsageLogUpdate) SetNillableRequestID(v *string) *UsageLogUpdate {
 	return _u
 }
 
+// SetCodexTurnState sets the "codex_turn_state" field.
+func (_u *UsageLogUpdate) SetCodexTurnState(v string) *UsageLogUpdate {
+	_u.mutation.SetCodexTurnState(v)
+	return _u
+}
+
+// SetNillableCodexTurnState sets the "codex_turn_state" field if the given value is not nil.
+func (_u *UsageLogUpdate) SetNillableCodexTurnState(v *string) *UsageLogUpdate {
+	if v != nil {
+		_u.SetCodexTurnState(*v)
+	}
+	return _u
+}
+
+// ClearCodexTurnState clears the value of the "codex_turn_state" field.
+func (_u *UsageLogUpdate) ClearCodexTurnState() *UsageLogUpdate {
+	_u.mutation.ClearCodexTurnState()
+	return _u
+}
+
 // SetModel sets the "model" field.
 func (_u *UsageLogUpdate) SetModel(v string) *UsageLogUpdate {
 	_u.mutation.SetModel(v)
@@ -1138,6 +1158,12 @@ func (_u *UsageLogUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	if value, ok := _u.mutation.RequestID(); ok {
 		_spec.SetField(usagelog.FieldRequestID, field.TypeString, value)
 	}
+	if value, ok := _u.mutation.CodexTurnState(); ok {
+		_spec.SetField(usagelog.FieldCodexTurnState, field.TypeString, value)
+	}
+	if _u.mutation.CodexTurnStateCleared() {
+		_spec.ClearField(usagelog.FieldCodexTurnState, field.TypeString)
+	}
 	if value, ok := _u.mutation.Model(); ok {
 		_spec.SetField(usagelog.FieldModel, field.TypeString, value)
 	}
@@ -1599,6 +1625,26 @@ func (_u *UsageLogUpdateOne) SetNillableRequestID(v *string) *UsageLogUpdateOne 
 	if v != nil {
 		_u.SetRequestID(*v)
 	}
+	return _u
+}
+
+// SetCodexTurnState sets the "codex_turn_state" field.
+func (_u *UsageLogUpdateOne) SetCodexTurnState(v string) *UsageLogUpdateOne {
+	_u.mutation.SetCodexTurnState(v)
+	return _u
+}
+
+// SetNillableCodexTurnState sets the "codex_turn_state" field if the given value is not nil.
+func (_u *UsageLogUpdateOne) SetNillableCodexTurnState(v *string) *UsageLogUpdateOne {
+	if v != nil {
+		_u.SetCodexTurnState(*v)
+	}
+	return _u
+}
+
+// ClearCodexTurnState clears the value of the "codex_turn_state" field.
+func (_u *UsageLogUpdateOne) ClearCodexTurnState() *UsageLogUpdateOne {
+	_u.mutation.ClearCodexTurnState()
 	return _u
 }
 
@@ -2681,6 +2727,12 @@ func (_u *UsageLogUpdateOne) sqlSave(ctx context.Context) (_node *UsageLog, err 
 	}
 	if value, ok := _u.mutation.RequestID(); ok {
 		_spec.SetField(usagelog.FieldRequestID, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.CodexTurnState(); ok {
+		_spec.SetField(usagelog.FieldCodexTurnState, field.TypeString, value)
+	}
+	if _u.mutation.CodexTurnStateCleared() {
+		_spec.ClearField(usagelog.FieldCodexTurnState, field.TypeString)
 	}
 	if value, ok := _u.mutation.Model(); ok {
 		_spec.SetField(usagelog.FieldModel, field.TypeString, value)

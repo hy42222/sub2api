@@ -9,6 +9,15 @@ import type { EndpointStat } from '@/types'
 
 // ==================== Types ====================
 
+export interface AdminUsageLogWithCodexTurnState extends AdminUsageLog {
+  codex_turn_state_length: number | null
+}
+
+export interface CodexTurnStateDetailResponse {
+  codex_turn_state: string
+  codex_turn_state_length: number
+}
+
 export interface AdminUsageStatsResponse {
   total_requests: number
   total_input_tokens: number
@@ -103,11 +112,26 @@ export interface AdminUsageQueryParams extends UsageQueryParams {
 export async function list(
   params: AdminUsageQueryParams,
   options?: { signal?: AbortSignal }
-): Promise<PaginatedResponse<AdminUsageLog>> {
-  const { data } = await apiClient.get<PaginatedResponse<AdminUsageLog>>('/admin/usage', {
+): Promise<PaginatedResponse<AdminUsageLogWithCodexTurnState>> {
+  const { data } = await apiClient.get<PaginatedResponse<AdminUsageLogWithCodexTurnState>>('/admin/usage', {
     params,
     signal: options?.signal
   })
+  return data
+}
+
+/**
+ * Get the complete X-Codex-Turn-State value for one usage record (admin only).
+ * The value is deliberately fetched only after an administrator opens its detail.
+ */
+export async function getCodexTurnState(
+  usageId: number,
+  options?: { signal?: AbortSignal }
+): Promise<CodexTurnStateDetailResponse> {
+  const { data } = await apiClient.get<CodexTurnStateDetailResponse>(
+    `/admin/usage/${usageId}/codex-turn-state`,
+    { signal: options?.signal }
+  )
   return data
 }
 
@@ -209,6 +233,7 @@ export async function cancelCleanupTask(taskId: number): Promise<{ id: number; s
 
 export const adminUsageAPI = {
   list,
+  getCodexTurnState,
   getStats,
   searchUsers,
   searchApiKeys,

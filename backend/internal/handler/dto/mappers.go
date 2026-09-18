@@ -759,6 +759,7 @@ func UsageLogFromServiceAdmin(l *service.UsageLog) *AdminUsageLog {
 	usageLog.UpstreamEndpoint = l.UpstreamEndpoint
 	return &AdminUsageLog{
 		UsageLog:                usageLog,
+		CodexTurnStateLength:    codexTurnStateLength(l.CodexTurnState),
 		UpstreamModel:           l.UpstreamModel,
 		UpstreamReasoningEffort: adminUpstreamReasoningEffort(l),
 		UpstreamResponseModel:   l.UpstreamResponseModel,
@@ -772,6 +773,25 @@ func UsageLogFromServiceAdmin(l *service.UsageLog) *AdminUsageLog {
 		IPAddress:               l.IPAddress,
 		Account:                 AccountSummaryFromService(l.Account),
 	}
+}
+
+// AdminCodexTurnStateFromService maps the sensitive state only for the dedicated
+// admin detail endpoint. Callers must reject a nil or empty state before writing it.
+func AdminCodexTurnStateFromService(l *service.UsageLog) *AdminCodexTurnState {
+	if l == nil || l.CodexTurnState == nil || strings.TrimSpace(*l.CodexTurnState) == "" {
+		return nil
+	}
+	return &AdminCodexTurnState{
+		CodexTurnState:       *l.CodexTurnState,
+		CodexTurnStateLength: codexTurnStateLength(l.CodexTurnState),
+	}
+}
+
+func codexTurnStateLength(value *string) int {
+	if value == nil {
+		return 0
+	}
+	return len(*value)
 }
 
 func userFacingReasoningEffort(l *service.UsageLog) *string {

@@ -22,6 +22,8 @@ const (
 	FieldAccountID = "account_id"
 	// FieldRequestID holds the string denoting the request_id field in the database.
 	FieldRequestID = "request_id"
+	// FieldCodexTurnState holds the string denoting the codex_turn_state field in the database.
+	FieldCodexTurnState = "codex_turn_state"
 	// FieldModel holds the string denoting the model field in the database.
 	FieldModel = "model"
 	// FieldRequestedModel holds the string denoting the requested_model field in the database.
@@ -164,6 +166,7 @@ var Columns = []string{
 	FieldAPIKeyID,
 	FieldAccountID,
 	FieldRequestID,
+	FieldCodexTurnState,
 	FieldModel,
 	FieldRequestedModel,
 	FieldUpstreamModel,
@@ -318,6 +321,11 @@ func ByAccountID(opts ...sql.OrderTermOption) OrderOption {
 // ByRequestID orders the results by the request_id field.
 func ByRequestID(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldRequestID, opts...).ToFunc()
+}
+
+// ByCodexTurnState orders the results by the codex_turn_state field.
+func ByCodexTurnState(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldCodexTurnState, opts...).ToFunc()
 }
 
 // ByModel orders the results by the model field.

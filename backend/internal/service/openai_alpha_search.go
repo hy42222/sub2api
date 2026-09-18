@@ -130,6 +130,7 @@ func (s *OpenAIGatewayService) ForwardAlphaSearch(ctx context.Context, c *gin.Co
 	return &OpenAIForwardResult{
 		RequestID:       strings.TrimSpace(resp.Header.Get("x-request-id")),
 		UpstreamHeaders: resp.Header,
+		CodexTurnState:  openAICodexTurnStateOutbound(c),
 		Model:           requestedModel,
 		UpstreamModel:   upstreamModel,
 		Duration:        time.Since(upstreamStart),
@@ -214,6 +215,7 @@ func (s *OpenAIGatewayService) forwardAlphaSearchViaResponsesWebSearch(
 	return &OpenAIForwardResult{
 		RequestID:        strings.TrimSpace(resp.Header.Get("x-request-id")),
 		UpstreamHeaders:  resp.Header,
+		CodexTurnState:   openAICodexTurnStateOutbound(c),
 		Model:            requestedModel,
 		UpstreamModel:    upstreamModel,
 		UpstreamEndpoint: "/v1/responses",
@@ -284,6 +286,7 @@ func (s *OpenAIGatewayService) buildOpenAIAlphaSearchResponsesWebSearchRequest(c
 	applyCodexAccountIdentityHeaders(req.Header, codexAccountIdentitySource(c, account), apiKeyID)
 	enforceCodexIdentityHeadersWithUA(req.Header, s.codexIdentityOverrideUA(account))
 	account.ApplyHeaderOverrides(req.Header)
+	noteOpenAICodexTurnStateOutbound(c, account, req.Header)
 	return req, nil
 }
 
@@ -426,6 +429,7 @@ func (s *OpenAIGatewayService) buildOpenAIAlphaSearchRequest(ctx context.Context
 
 	account.ApplyHeaderOverrides(req.Header)
 	stripOpenAIAlphaSearchResponsesHeaders(req.Header)
+	noteOpenAICodexTurnStateOutbound(c, account, req.Header)
 	return req, nil
 }
 

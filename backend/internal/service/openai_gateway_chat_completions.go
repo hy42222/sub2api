@@ -624,6 +624,7 @@ func (s *OpenAIGatewayService) handleChatBufferedStreamingResponse(
 	result := &OpenAIForwardResult{
 		RequestID:                     requestID,
 		UpstreamHeaders:               resp.Header,
+		CodexTurnState:                openAICodexTurnStateOutbound(c),
 		Usage:                         usage,
 		Model:                         originalModel,
 		BillingModel:                  billingModel,
@@ -746,6 +747,7 @@ func (s *OpenAIGatewayService) handleChatStreamingResponse(
 		out := &OpenAIForwardResult{
 			RequestID:                     requestID,
 			UpstreamHeaders:               resp.Header,
+			CodexTurnState:                openAICodexTurnStateOutbound(c),
 			Usage:                         usage,
 			Model:                         originalModel,
 			BillingModel:                  billingModel,

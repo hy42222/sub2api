@@ -671,6 +671,10 @@ type UsageLog struct {
 type AdminUsageLog struct {
 	UsageLog
 
+	// CodexTurnStateLength is the byte length of the stored X-Codex-Turn-State.
+	// The state itself is available only through the dedicated admin detail endpoint.
+	CodexTurnStateLength int `json:"codex_turn_state_length"`
+
 	// UpstreamModel is the actual model sent to the upstream provider after mapping.
 	// Omitted when no mapping was applied (requested model was used as-is).
 	UpstreamModel *string `json:"upstream_model,omitempty"`
@@ -701,6 +705,12 @@ type AdminUsageLog struct {
 
 	// Account 最小账号信息（避免泄露敏感字段）
 	Account *AccountSummary `json:"account,omitempty"`
+}
+
+// AdminCodexTurnState is the sensitive, admin-only detail for one usage record.
+type AdminCodexTurnState struct {
+	CodexTurnState       string `json:"codex_turn_state"`
+	CodexTurnStateLength int    `json:"codex_turn_state_length"`
 }
 
 type UsageCleanupFilters struct {

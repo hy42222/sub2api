@@ -520,6 +520,7 @@ func (s *OpenAIGatewayService) forwardOpenAIPassthrough(
 	forwardResult := &OpenAIForwardResult{
 		RequestID:                     resp.Header.Get("x-request-id"),
 		UpstreamHeaders:               resp.Header,
+		CodexTurnState:                openAICodexTurnStateOutbound(c),
 		ResponseID:                    responseID,
 		Usage:                         *usage,
 		Model:                         reqModel,
@@ -727,6 +728,7 @@ func (s *OpenAIGatewayService) buildUpstreamRequestOpenAIPassthrough(
 	applyOpenAICodexBetaFeatures(c, account, req.Header)
 	setOpenAICodexRoutingHintFromBody(req.Header, account, body)
 	logOpenAIRoutingDiagnosticsFromBody(ctx, account, "http_passthrough", req.Header, body, "not_applicable")
+	noteOpenAICodexTurnStateOutbound(c, account, req.Header)
 
 	return req, nil
 }

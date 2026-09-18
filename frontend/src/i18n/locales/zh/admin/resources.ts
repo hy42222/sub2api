@@ -521,6 +521,17 @@ export default {
       upstreamRequestId: '上游ID',
       requestIdCopied: '请求ID已复制',
       upstreamRequestIdCopied: '上游ID已复制',
+      codexTurnStateLength: 'X-Codex-Turn-State 长度',
+      codexTurnState: {
+        title: 'X-Codex-Turn-State',
+        viewDetails: '查看 X-Codex-Turn-State',
+        loading: '正在加载 X-Codex-Turn-State...',
+        loadFailed: '加载 X-Codex-Turn-State 失败',
+        retry: '重试',
+        length: '长度',
+        copy: '复制值',
+        copied: '已复制值'
+      },
       allModels: '全部模型',
       allAccounts: '全部账户',
       allGroups: '全部分组',

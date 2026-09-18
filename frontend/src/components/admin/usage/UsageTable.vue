@@ -291,6 +291,21 @@
           <span v-else class="text-sm text-gray-400 dark:text-gray-500">-</span>
         </template>
 
+        <template #cell-codex_turn_state_length="{ row }">
+          <button
+            v-if="row.codex_turn_state_length != null && row.codex_turn_state_length > 0"
+            type="button"
+            data-testid="codex-turn-state-detail"
+            class="inline-flex items-center gap-1 rounded px-1.5 py-1 font-mono text-xs tabular-nums text-primary-600 underline decoration-dashed underline-offset-2 transition-colors hover:bg-primary-50 hover:text-primary-700 dark:text-primary-400 dark:hover:bg-primary-900/30 dark:hover:text-primary-300"
+            :title="t('admin.usage.codexTurnState.viewDetails')"
+            @click="openCodexTurnState(row)"
+          >
+            <span>{{ row.codex_turn_state_length.toLocaleString() }}</span>
+            <Icon name="eye" size="xs" aria-hidden="true" />
+          </button>
+          <span v-else class="text-sm text-gray-400 dark:text-gray-500">-</span>
+        </template>
+
         <template #cell-user_agent="{ row }">
           <span v-if="row.user_agent" class="text-sm text-gray-600 dark:text-gray-400 block max-w-[320px] truncate" :title="row.user_agent">{{ formatUserAgent(row.user_agent) }}</span>
           <span v-else class="text-sm text-gray-400 dark:text-gray-500">-</span>
@@ -529,12 +544,60 @@
       </div>
     </div>
   </Teleport>
+
+  <BaseDialog
+    :show="codexTurnStateDialogVisible"
+    :title="t('admin.usage.codexTurnState.title')"
+    width="wide"
+    :close-on-click-outside="true"
+    @close="closeCodexTurnState"
+  >
+    <div class="space-y-4">
+      <div v-if="codexTurnStateLoading" class="flex items-center justify-center gap-3 py-10 text-sm text-gray-500 dark:text-gray-400" role="status">
+        <span class="h-5 w-5 animate-spin rounded-full border-2 border-primary-200 border-t-primary-600 dark:border-primary-900 dark:border-t-primary-400" aria-hidden="true"></span>
+        {{ t('admin.usage.codexTurnState.loading') }}
+      </div>
+
+      <div v-else-if="codexTurnStateError" class="space-y-3 py-6 text-center" role="alert">
+        <p class="text-sm text-red-600 dark:text-red-400">{{ t('admin.usage.codexTurnState.loadFailed') }}</p>
+        <button type="button" class="btn btn-secondary btn-sm" @click="loadCodexTurnState">
+          <Icon name="refresh" size="sm" />
+          {{ t('admin.usage.codexTurnState.retry') }}
+        </button>
+      </div>
+
+      <template v-else-if="codexTurnStateDetail">
+        <div class="flex flex-wrap items-center justify-between gap-3 border-b border-gray-200 pb-3 dark:border-dark-700">
+          <span class="text-sm text-gray-500 dark:text-gray-400">{{ t('admin.usage.codexTurnState.length') }}</span>
+          <span class="font-mono text-sm font-semibold tabular-nums text-gray-900 dark:text-white">{{ codexTurnStateDetail.codex_turn_state_length.toLocaleString() }}</span>
+        </div>
+        <pre data-testid="codex-turn-state-value" class="max-h-[min(60vh,32rem)] overflow-auto whitespace-pre-wrap break-all rounded-md border border-gray-200 bg-gray-50 p-3 font-mono text-xs leading-5 text-gray-800 dark:border-dark-700 dark:bg-dark-900 dark:text-gray-200">{{ codexTurnStateDetail.codex_turn_state }}</pre>
+      </template>
+    </div>
+
+    <template #footer>
+      <button
+        type="button"
+        class="btn btn-secondary btn-sm"
+        :disabled="codexTurnStateLoading || !codexTurnStateDetail"
+        @click="copyCodexTurnState"
+      >
+        <Icon :name="codexTurnStateCopied ? 'check' : 'copy'" size="sm" />
+        {{ codexTurnStateCopied ? t('admin.usage.codexTurnState.copied') : t('admin.usage.codexTurnState.copy') }}
+      </button>
+      <button type="button" class="btn btn-primary btn-sm" @click="closeCodexTurnState">
+        {{ t('common.close') }}
+      </button>
+    </template>
+  </BaseDialog>
 </template>
 
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useAppStore } from '@/stores/app'
+import BaseDialog from '@/components/common/BaseDialog.vue'
+import { adminUsageAPI } from '@/api/admin/usage'
 import { formatDateTime, formatReasoningEffort, reasoningEffortValuesEqual } from '@/utils/format'
 import { formatCacheTokens, formatMultiplier } from '@/utils/formatters'
 import { formatTokenPricePerMillion } from '@/utils/usagePricing'
@@ -584,10 +647,13 @@ import IpGeoCell from '@/components/common/IpGeoCell.vue'
 import Icon from '@/components/icons/Icon.vue'
 import { fetchBatch, getEntry } from '@/utils/ipGeoLookup'
 import type { AdminUsageLog } from '@/types'
+import type { CodexTurnStateDetailResponse } from '@/api/admin/usage'
 import type { Column } from '@/components/common/types'
 
+type UsageTableRow = AdminUsageLog & { codex_turn_state_length?: number | null }
+
 interface Props {
-  data: AdminUsageLog[]
+  data: UsageTableRow[]
   loading?: boolean
   columns: Column[]
   serverSideSort?: boolean
@@ -619,6 +685,14 @@ const copiedRequestId = ref<string | null>(null)
 const showAccountBilling = props.showAccountBilling
 const showUpstreamEndpoint = props.showUpstreamEndpoint
 const ipGeoBatchLoading = ref(false)
+const codexTurnStateDialogVisible = ref(false)
+const codexTurnStateLoading = ref(false)
+const codexTurnStateError = ref(false)
+const codexTurnStateCopied = ref(false)
+const codexTurnStateDetail = ref<CodexTurnStateDetailResponse | null>(null)
+const selectedCodexTurnStateRow = ref<UsageTableRow | null>(null)
+let codexTurnStateRequestSeq = 0
+let codexTurnStateAbortController: AbortController | null = null
 
 const showIpGeoToolbar = computed(() => props.columns.some((col) => col.key === 'ip_address'))
 
@@ -687,6 +761,65 @@ const copyIdentifier = async (value: string, copiedMessage: string) => {
 const copyRequestId = (requestId: string) => copyIdentifier(requestId, t('admin.usage.requestIdCopied'))
 const copyUpstreamRequestId = (upstreamRequestId: string) =>
   copyIdentifier(upstreamRequestId, t('admin.usage.upstreamRequestIdCopied'))
+
+const loadCodexTurnState = async () => {
+  const row = selectedCodexTurnStateRow.value
+  if (!row || row.codex_turn_state_length == null || row.codex_turn_state_length <= 0) return
+
+  codexTurnStateAbortController?.abort()
+  const controller = new AbortController()
+  codexTurnStateAbortController = controller
+  const requestSeq = ++codexTurnStateRequestSeq
+  codexTurnStateLoading.value = true
+  codexTurnStateError.value = false
+  codexTurnStateCopied.value = false
+  codexTurnStateDetail.value = null
+
+  try {
+    const detail = await adminUsageAPI.getCodexTurnState(row.id, { signal: controller.signal })
+    if (requestSeq !== codexTurnStateRequestSeq || controller.signal.aborted) return
+    codexTurnStateDetail.value = detail
+  } catch {
+    if (requestSeq !== codexTurnStateRequestSeq || controller.signal.aborted) return
+    codexTurnStateError.value = true
+  } finally {
+    if (requestSeq === codexTurnStateRequestSeq) {
+      codexTurnStateLoading.value = false
+      if (codexTurnStateAbortController === controller) codexTurnStateAbortController = null
+    }
+  }
+}
+
+const openCodexTurnState = (row: UsageTableRow) => {
+  if (row.codex_turn_state_length == null || row.codex_turn_state_length <= 0) return
+  selectedCodexTurnStateRow.value = row
+  codexTurnStateDialogVisible.value = true
+  void loadCodexTurnState()
+}
+
+const closeCodexTurnState = () => {
+  codexTurnStateRequestSeq++
+  codexTurnStateAbortController?.abort()
+  codexTurnStateAbortController = null
+  codexTurnStateDialogVisible.value = false
+  codexTurnStateLoading.value = false
+  codexTurnStateError.value = false
+  codexTurnStateCopied.value = false
+  codexTurnStateDetail.value = null
+  selectedCodexTurnStateRow.value = null
+}
+
+const copyCodexTurnState = async () => {
+  const value = codexTurnStateDetail.value?.codex_turn_state
+  if (!value) return
+  try {
+    await navigator.clipboard.writeText(value)
+    codexTurnStateCopied.value = true
+    appStore.showSuccess(t('admin.usage.codexTurnState.copied'))
+  } catch {
+    appStore.showError(t('common.copyFailed'))
+  }
+}
 
 // Tooltip state - cost
 const tooltipVisible = ref(false)

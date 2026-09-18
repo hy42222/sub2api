@@ -524,6 +524,17 @@ export default {
       upstreamRequestId: 'Upstream ID',
       requestIdCopied: 'Request ID copied',
       upstreamRequestIdCopied: 'Upstream ID copied',
+      codexTurnStateLength: 'X-Codex-Turn-State length',
+      codexTurnState: {
+        title: 'X-Codex-Turn-State',
+        viewDetails: 'View X-Codex-Turn-State',
+        loading: 'Loading X-Codex-Turn-State...',
+        loadFailed: 'Failed to load X-Codex-Turn-State',
+        retry: 'Retry',
+        length: 'Length',
+        copy: 'Copy value',
+        copied: 'Value copied'
+      },
       allModels: 'All Models',
       allAccounts: 'All Accounts',
       allGroups: 'All Groups',

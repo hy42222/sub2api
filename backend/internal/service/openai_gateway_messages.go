@@ -383,6 +383,7 @@ func (s *OpenAIGatewayService) ForwardAsAnthropic(
 	if compatTurnState != "" && upstreamReq.Header.Get("x-codex-turn-state") == "" {
 		upstreamReq.Header.Set("x-codex-turn-state", compatTurnState)
 	}
+	noteOpenAICodexTurnStateOutbound(c, account, upstreamReq.Header)
 
 	// 7. Send request
 	proxyURL := ""
@@ -665,6 +666,7 @@ func (s *OpenAIGatewayService) handleAnthropicBufferedStreamingResponse(
 	result := &OpenAIForwardResult{
 		RequestID:                     requestID,
 		UpstreamHeaders:               resp.Header,
+		CodexTurnState:                openAICodexTurnStateOutbound(c),
 		ResponseID:                    finalResponse.ID,
 		Usage:                         usage,
 		Model:                         originalModel,
@@ -972,6 +974,7 @@ func (s *OpenAIGatewayService) handleAnthropicStreamingResponse(
 		out := &OpenAIForwardResult{
 			RequestID:                     requestID,
 			UpstreamHeaders:               resp.Header,
+			CodexTurnState:                openAICodexTurnStateOutbound(c),
 			ResponseID:                    responseID,
 			Usage:                         usage,
 			Model:                         originalModel,

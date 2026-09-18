@@ -15,6 +15,8 @@ import (
 // codex-api/src/sse/responses.rs 与 endpoint/compact.rs）。
 const openAICodexTurnStateHeader = "x-codex-turn-state"
 
+const openAICodexTurnStateOutboundContextKey = "openai_codex_turn_state_outbound"
+
 // turn-state blob 是上游在"出站身份"（含 #5553 指纹收敛改写后的
 // installation/session/thread 标识）下铸造的，同账号回放自洽；跨账号回放
 // （failover 换号后客户端仍回带旧账号的 blob）是代理链独有、真实 Codex
@@ -97,6 +99,32 @@ func extractOpenAICodexTurnState(upstream http.Header) string {
 		return ""
 	}
 	return strings.TrimSpace(upstream.Get(openAICodexTurnStateHeader))
+}
+
+// noteOpenAICodexTurnStateOutbound records the final request header after all
+// account identity, failover, and header override logic has run. The value is
+// request-local so a later failover attempt replaces, rather than reuses, it.
+func noteOpenAICodexTurnStateOutbound(c *gin.Context, account *Account, headers http.Header) {
+	if c == nil {
+		return
+	}
+	state := ""
+	if account != nil && account.UsesOpenAICodexProtocol() {
+		state = extractOpenAICodexTurnState(headers)
+	}
+	c.Set(openAICodexTurnStateOutboundContextKey, state)
+}
+
+func openAICodexTurnStateOutbound(c *gin.Context) string {
+	if c == nil {
+		return ""
+	}
+	value, ok := c.Get(openAICodexTurnStateOutboundContextKey)
+	if !ok {
+		return ""
+	}
+	state, _ := value.(string)
+	return strings.TrimSpace(state)
 }
 
 // noteOpenAICodexTurnStateProvenance 记录（下游会话 → 铸造账号）。

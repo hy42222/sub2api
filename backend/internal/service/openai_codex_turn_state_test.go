@@ -144,6 +144,34 @@ func TestNoteStagedOpenAICodexTurnStateCommitted_NoopWithoutState(t *testing.T) 
 	require.False(t, ok)
 }
 
+func TestOpenAICodexTurnStateOutboundSnapshot(t *testing.T) {
+	svc := &OpenAIGatewayService{}
+	c, _ := newTurnStateTestContext(t, 13, "sess-outbound")
+	codexAccount := &Account{ID: 61, Platform: PlatformOpenAI, Type: AccountTypeOAuth}
+
+	finalHeaders := http.Header{}
+	finalHeaders.Set(openAICodexTurnStateHeader, "  blob-final  ")
+	noteOpenAICodexTurnStateOutbound(c, codexAccount, finalHeaders)
+	require.Equal(t, "blob-final", openAICodexTurnStateOutbound(c))
+
+	// A failover guard may remove a value that was carried from another account;
+	// the usage result must then observe an empty snapshot rather than the stale blob.
+	foreignResponseHeaders := http.Header{}
+	foreignResponseHeaders.Set(openAICodexTurnStateHeader, "blob-foreign")
+	svc.relayOpenAICodexTurnState(c, &Account{ID: 60}, foreignResponseHeaders)
+	guardedHeaders := http.Header{}
+	guardedHeaders.Set(openAICodexTurnStateHeader, "blob-foreign")
+	svc.guardOpenAICodexTurnStateEcho(c, codexAccount, guardedHeaders)
+	noteOpenAICodexTurnStateOutbound(c, codexAccount, guardedHeaders)
+	require.Empty(t, openAICodexTurnStateOutbound(c))
+
+	// Empty and non-Codex headers must not leave an earlier request-local value.
+	noteOpenAICodexTurnStateOutbound(c, codexAccount, http.Header{})
+	require.Empty(t, openAICodexTurnStateOutbound(c))
+	noteOpenAICodexTurnStateOutbound(c, &Account{Platform: PlatformAnthropic, Type: AccountTypeAPIKey}, finalHeaders)
+	require.Empty(t, openAICodexTurnStateOutbound(c))
+}
+
 func TestGuardOpenAICodexTurnStateEcho(t *testing.T) {
 	newOutbound := func(state string) http.Header {
 		h := http.Header{}
