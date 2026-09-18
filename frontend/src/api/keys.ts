@@ -176,8 +176,34 @@ export async function regenerate(id: number): Promise<ApiKey> {
   if (storageKey) {
     regenerateOperationKeys.delete(storageKey)
     storeRegenerateOperationKey(storageKey, null)
-  }
+	}
   return data
+}
+
+export interface BulkUpdateApiKeysResult {
+  succeededIds: number[]
+  failures: Array<{ id: number; error: unknown }>
+}
+
+/** Reuse per-key validation and permissions, with at most five requests in flight. */
+export async function bulkUpdate(
+  ids: number[],
+  updates: UpdateApiKeyRequest
+): Promise<BulkUpdateApiKeysResult> {
+  const uniqueIds = [...new Set(ids)]
+  const result: BulkUpdateApiKeysResult = { succeededIds: [], failures: [] }
+  for (let offset = 0; offset < uniqueIds.length; offset += 5) {
+    const batch = uniqueIds.slice(offset, offset + 5)
+    const responses = await Promise.allSettled(batch.map((id) => update(id, updates)))
+    responses.forEach((response, index) => {
+      if (response.status === 'fulfilled') {
+        result.succeededIds.push(batch[index])
+      } else {
+        result.failures.push({ id: batch[index], error: response.reason })
+      }
+    })
+  }
+  return result
 }
 
 /**
@@ -203,10 +229,11 @@ export async function toggleStatus(id: number, status: 'active' | 'inactive'): P
 export const keysAPI = {
   list,
   getById,
-  create,
-  update,
-  regenerate,
-  delete: deleteKey,
+	create,
+	update,
+	regenerate,
+	bulkUpdate,
+	delete: deleteKey,
   toggleStatus
 }
 
