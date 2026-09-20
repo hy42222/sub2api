@@ -1045,6 +1045,19 @@ func (s *SettingService) SetOpenAIFastPolicySettings(ctx context.Context, settin
 			}
 			seenUserIDs[userID] = struct{}{}
 		}
+		if len(rule.APIKeyIDs) > 0 && len(rule.UserIDs) > 0 {
+			return fmt.Errorf("rule[%d]: api_key_ids and user_ids cannot be combined", i)
+		}
+		seenAPIKeyIDs := make(map[int64]struct{}, len(rule.APIKeyIDs))
+		for j, apiKeyID := range rule.APIKeyIDs {
+			if apiKeyID <= 0 {
+				return fmt.Errorf("rule[%d]: api_key_ids[%d] must be positive", i, j)
+			}
+			if _, exists := seenAPIKeyIDs[apiKeyID]; exists {
+				return fmt.Errorf("rule[%d]: api_key_ids[%d] duplicates api_key_id %d", i, j, apiKeyID)
+			}
+			seenAPIKeyIDs[apiKeyID] = struct{}{}
+		}
 		for j, pattern := range rule.ModelWhitelist {
 			trimmed := strings.TrimSpace(pattern)
 			if trimmed == "" {

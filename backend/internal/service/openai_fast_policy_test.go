@@ -179,6 +179,99 @@ func TestEvaluateOpenAIFastPolicy_UserScopedRuleOverridesGlobalRule(t *testing.T
 	require.Equal(t, BetaPolicyActionFilter, action)
 }
 
+func TestApplyOpenAIFastPolicyToBody_APIKeyScopedRuleMatchesModelAndMissingTier(t *testing.T) {
+	settings := &OpenAIFastPolicySettings{
+		Rules: []OpenAIFastPolicyRule{{
+			ServiceTier:        OpenAIFastTierAny,
+			Action:             OpenAIFastPolicyActionForcePriority,
+			Scope:              BetaPolicyScopeAll,
+			APIKeyIDs:          []int64{77},
+			IncludeMissingTier: true,
+			ModelWhitelist:     []string{"gpt-5.6-sol"},
+			FallbackAction:     BetaPolicyActionPass,
+		}},
+	}
+	svc := newOpenAIGatewayServiceWithSettings(t, settings)
+	account := &Account{Platform: PlatformOpenAI, Type: AccountTypeAPIKey}
+	matchingCtx := context.WithValue(context.Background(), ctxkey.APIKeyID, int64(77))
+
+	updated, err := svc.applyOpenAIFastPolicyToBody(
+		matchingCtx,
+		account,
+		"gpt-5.6-sol",
+		[]byte(`{"model":"gpt-5.6-sol"}`),
+	)
+	require.NoError(t, err)
+	require.Equal(t, OpenAIFastTierPriority, gjson.GetBytes(updated, "service_tier").String())
+
+	updated, err = svc.applyOpenAIFastPolicyToBody(
+		matchingCtx,
+		account,
+		"gpt-5.6-sol",
+		[]byte(`{"model":"gpt-5.6-sol","service_tier":"flex"}`),
+	)
+	require.NoError(t, err)
+	require.Equal(t, OpenAIFastTierPriority, gjson.GetBytes(updated, "service_tier").String())
+
+	otherKeyCtx := context.WithValue(context.Background(), ctxkey.APIKeyID, int64(78))
+	updated, err = svc.applyOpenAIFastPolicyToBody(
+		otherKeyCtx,
+		account,
+		"gpt-5.6-sol",
+		[]byte(`{"model":"gpt-5.6-sol"}`),
+	)
+	require.NoError(t, err)
+	require.False(t, gjson.GetBytes(updated, "service_tier").Exists())
+
+	updated, err = svc.applyOpenAIFastPolicyToBody(
+		matchingCtx,
+		account,
+		"gpt-5.5",
+		[]byte(`{"model":"gpt-5.5"}`),
+	)
+	require.NoError(t, err)
+	require.False(t, gjson.GetBytes(updated, "service_tier").Exists())
+}
+
+func TestEvaluateOpenAIFastPolicy_APIKeyRulePrecedesUserAndGlobalRules(t *testing.T) {
+	settings := &OpenAIFastPolicySettings{
+		Rules: []OpenAIFastPolicyRule{
+			{
+				ServiceTier: OpenAIFastTierPriority,
+				Action:      BetaPolicyActionFilter,
+				Scope:       BetaPolicyScopeAll,
+			},
+			{
+				ServiceTier: OpenAIFastTierPriority,
+				Action:      BetaPolicyActionBlock,
+				Scope:       BetaPolicyScopeAll,
+				UserIDs:     []int64{42},
+			},
+			{
+				ServiceTier: OpenAIFastTierPriority,
+				Action:      OpenAIFastPolicyActionForcePriority,
+				Scope:       BetaPolicyScopeAll,
+				APIKeyIDs:   []int64{77},
+			},
+		},
+	}
+	svc := newOpenAIGatewayServiceWithSettings(t, settings)
+	account := &Account{Platform: PlatformOpenAI, Type: AccountTypeAPIKey}
+
+	keyCtx := context.WithValue(context.Background(), ctxkey.UserID, int64(42))
+	keyCtx = context.WithValue(keyCtx, ctxkey.APIKeyID, int64(77))
+	action, _ := svc.evaluateOpenAIFastPolicy(keyCtx, account, "gpt-5.6-sol", OpenAIFastTierPriority)
+	require.Equal(t, OpenAIFastPolicyActionForcePriority, action)
+
+	userCtx := context.WithValue(context.Background(), ctxkey.UserID, int64(42))
+	action, _ = svc.evaluateOpenAIFastPolicy(userCtx, account, "gpt-5.6-sol", OpenAIFastTierPriority)
+	require.Equal(t, BetaPolicyActionBlock, action)
+
+	globalCtx := context.WithValue(context.Background(), ctxkey.APIKeyID, int64(78))
+	action, _ = svc.evaluateOpenAIFastPolicy(globalCtx, account, "gpt-5.6-sol", OpenAIFastTierPriority)
+	require.Equal(t, BetaPolicyActionFilter, action)
+}
+
 func TestApplyOpenAIFastPolicyToBody_DefaultPassesPriorityAndFast(t *testing.T) {
 	svc := newOpenAIGatewayServiceWithSettings(t, DefaultOpenAIFastPolicySettings())
 	account := &Account{Platform: PlatformOpenAI, Type: AccountTypeAPIKey}
@@ -535,6 +628,38 @@ func TestSetOpenAIFastPolicySettings_Validation(t *testing.T) {
 			Action:      BetaPolicyActionPass,
 			Scope:       BetaPolicyScopeAll,
 			UserIDs:     []int64{0},
+		}},
+	})
+	require.Error(t, err)
+
+	// API key IDs must be positive, unique, and cannot be combined with user IDs.
+	err = svc.SetOpenAIFastPolicySettings(context.Background(), &OpenAIFastPolicySettings{
+		Rules: []OpenAIFastPolicyRule{{
+			ServiceTier: OpenAIFastTierPriority,
+			Action:      BetaPolicyActionPass,
+			Scope:       BetaPolicyScopeAll,
+			APIKeyIDs:   []int64{0},
+		}},
+	})
+	require.Error(t, err)
+
+	err = svc.SetOpenAIFastPolicySettings(context.Background(), &OpenAIFastPolicySettings{
+		Rules: []OpenAIFastPolicyRule{{
+			ServiceTier: OpenAIFastTierPriority,
+			Action:      BetaPolicyActionPass,
+			Scope:       BetaPolicyScopeAll,
+			APIKeyIDs:   []int64{77, 77},
+		}},
+	})
+	require.Error(t, err)
+
+	err = svc.SetOpenAIFastPolicySettings(context.Background(), &OpenAIFastPolicySettings{
+		Rules: []OpenAIFastPolicyRule{{
+			ServiceTier: OpenAIFastTierPriority,
+			Action:      BetaPolicyActionPass,
+			Scope:       BetaPolicyScopeAll,
+			APIKeyIDs:   []int64{77},
+			UserIDs:     []int64{42},
 		}},
 	})
 	require.Error(t, err)

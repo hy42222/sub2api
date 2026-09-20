@@ -1312,6 +1312,10 @@ describe("admin SettingsView payment visible method controls", () => {
     await flushPromises();
     await openGatewayTab(wrapper);
 
+    expect(
+      wrapper.get('[data-testid="openai-fast-policy-include-missing-0"]'),
+    ).toBeTruthy();
+
     const summary = wrapper.get('[data-testid="openai-fast-policy-summary-0"]');
     expect(summary.text()).toContain("目标模型");
     expect(summary.text()).toContain("过滤");
@@ -1327,6 +1331,30 @@ describe("admin SettingsView payment visible method controls", () => {
     expect(summary.text()).toContain("过滤");
     expect(summary.text()).not.toContain("其他模型");
     expect(summary.text()).not.toContain("透传");
+  });
+
+  it("only shows the missing-tier option for all-tier rules", async () => {
+    getSettings.mockResolvedValueOnce({
+      ...baseSettingsResponse,
+      openai_fast_policy_settings: {
+        rules: [
+          {
+            service_tier: "priority",
+            action: "force_priority",
+            scope: "all",
+          },
+        ],
+      },
+    });
+    const wrapper = mountView();
+
+    await flushPromises();
+    await openGatewayTab(wrapper);
+
+    expect(
+      wrapper.find('[data-testid="openai-fast-policy-include-missing-0"]')
+        .exists(),
+    ).toBe(false);
   });
 
   it("loads and saves upstream billing probe settings from the gateway tab", async () => {

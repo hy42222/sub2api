@@ -1444,7 +1444,9 @@ export interface OpenAIFastPolicyRule {
   service_tier: "all" | "priority" | "flex" | "ultrafast" | "missing";
   action: "pass" | "filter" | "block" | "force_priority";
   scope: "all" | "oauth" | "apikey" | "bedrock";
+  api_key_ids?: number[];
   user_ids?: number[];
+  include_missing_tier?: boolean;
   error_message?: string;
   model_whitelist?: string[];
   fallback_action?: "pass" | "filter" | "block" | "force_priority";

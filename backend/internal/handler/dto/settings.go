@@ -514,7 +514,9 @@ type OpenAIFastPolicyRule struct {
 	ServiceTier          string   `json:"service_tier"`
 	Action               string   `json:"action"`
 	Scope                string   `json:"scope"`
+	APIKeyIDs            []int64  `json:"api_key_ids,omitempty"`
 	UserIDs              []int64  `json:"user_ids,omitempty"`
+	IncludeMissingTier   bool     `json:"include_missing_tier,omitempty"`
 	ErrorMessage         string   `json:"error_message,omitempty"`
 	ModelWhitelist       []string `json:"model_whitelist,omitempty"`
 	FallbackAction       string   `json:"fallback_action,omitempty"`

@@ -1183,6 +1183,7 @@
                         rule.service_tier = $event as
                           | 'all'
                           | 'priority'
+                          | 'ultrafast'
                           | 'flex'
                           | 'missing'
                       "
@@ -1231,6 +1232,24 @@
                   </div>
                 </div>
 
+                <!-- API Key Scope -->
+                <div class="mt-3">
+                  <label
+                    class="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400"
+                  >
+                    {{ t("admin.settings.openaiFastPolicy.apiKeys") }}
+                  </label>
+                  <p class="mb-2 text-xs text-gray-400 dark:text-gray-500">
+                    {{ t("admin.settings.openaiFastPolicy.apiKeysHint") }}
+                  </p>
+                  <OpenAIFastPolicyApiKeySelector
+                    :model-value="rule.api_key_ids || []"
+                    @update:model-value="
+                      updateOpenAIFastPolicyApiKeys(rule, $event)
+                    "
+                  />
+                </div>
+
                 <!-- User Scope -->
                 <div class="mt-3">
                   <label
@@ -1243,9 +1262,26 @@
                   </p>
                   <OpenAIFastPolicyUserSelector
                     :model-value="rule.user_ids || []"
-                    @update:model-value="rule.user_ids = $event"
+                    @update:model-value="
+                      updateOpenAIFastPolicyUsers(rule, $event)
+                    "
                   />
                 </div>
+
+                <label
+                  v-if="rule.service_tier === 'all'"
+                  :data-testid="`openai-fast-policy-include-missing-${ruleIndex}`"
+                  class="mt-3 flex items-start gap-2 text-xs text-gray-600 dark:text-gray-400"
+                >
+                  <input
+                    v-model="rule.include_missing_tier"
+                    type="checkbox"
+                    class="mt-0.5 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                  />
+                  <span>
+                    {{ t("admin.settings.openaiFastPolicy.includeMissingTier") }}
+                  </span>
+                </label>
 
                 <!-- Error Message (only when action=block) -->
                 <div v-if="rule.action === 'block'" class="mt-3">
@@ -8875,6 +8911,7 @@ import ImageUpload from "@/components/common/ImageUpload.vue";
 import BackupSettings from "@/views/admin/BackupView.vue";
 import EmailTemplateEditor from "@/views/admin/settings/EmailTemplateEditor.vue";
 import OpenAIFastPolicyUserSelector from "@/views/admin/settings/OpenAIFastPolicyUserSelector.vue";
+import OpenAIFastPolicyApiKeySelector from "@/views/admin/settings/OpenAIFastPolicyApiKeySelector.vue";
 import { useClipboard } from "@/composables/useClipboard";
 import {
   useStepUp,
@@ -10985,7 +11022,9 @@ async function loadSettings() {
       openaiFastPolicyForm.rules =
         settings.openai_fast_policy_settings.rules.map((rule) => ({
           ...rule,
+          api_key_ids: rule.api_key_ids ? [...rule.api_key_ids] : [],
           user_ids: rule.user_ids ? [...rule.user_ids] : [],
+          include_missing_tier: Boolean(rule.include_missing_tier),
           model_whitelist: rule.model_whitelist
             ? [...rule.model_whitelist]
             : [],
@@ -11573,10 +11612,15 @@ async function saveSettings() {
             service_tier: rule.service_tier,
             action: rule.action,
             scope: rule.scope,
+            api_key_ids:
+              rule.api_key_ids && rule.api_key_ids.length > 0
+                ? [...rule.api_key_ids]
+                : undefined,
             user_ids:
               rule.user_ids && rule.user_ids.length > 0
                 ? [...rule.user_ids]
                 : undefined,
+            include_missing_tier: rule.include_missing_tier || undefined,
             error_message:
               rule.action === "block" ? rule.error_message : undefined,
             model_whitelist: hasWhitelist ? whitelist : undefined,
@@ -11666,7 +11710,9 @@ async function saveSettings() {
       openaiFastPolicyForm.rules =
         updated.openai_fast_policy_settings.rules.map((rule) => ({
           ...rule,
+          api_key_ids: rule.api_key_ids ? [...rule.api_key_ids] : [],
           user_ids: rule.user_ids ? [...rule.user_ids] : [],
+          include_missing_tier: Boolean(rule.include_missing_tier),
           model_whitelist: rule.model_whitelist
             ? [...rule.model_whitelist]
             : [],
@@ -12218,12 +12264,34 @@ function addOpenAIFastPolicyRule() {
     service_tier: "priority",
     action: "filter",
     scope: "all",
+    api_key_ids: [],
     user_ids: [],
+    include_missing_tier: false,
     error_message: "",
     model_whitelist: [],
     fallback_action: "pass",
     fallback_error_message: "",
   });
+}
+
+function updateOpenAIFastPolicyApiKeys(
+  rule: OpenAIFastPolicyRule,
+  apiKeyIDs: number[],
+) {
+  rule.api_key_ids = apiKeyIDs;
+  if (apiKeyIDs.length > 0) {
+    rule.user_ids = [];
+  }
+}
+
+function updateOpenAIFastPolicyUsers(
+  rule: OpenAIFastPolicyRule,
+  userIDs: number[],
+) {
+  rule.user_ids = userIDs;
+  if (userIDs.length > 0) {
+    rule.api_key_ids = [];
+  }
 }
 
 function removeOpenAIFastPolicyRule(index: number) {

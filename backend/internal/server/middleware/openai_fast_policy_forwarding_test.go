@@ -18,7 +18,7 @@ import (
 	"github.com/tidwall/gjson"
 )
 
-func TestAPIKeyAuthForwardsUserScopedOpenAIFastPolicyToUpstream(t *testing.T) {
+func TestAPIKeyAuthForwardsAPIKeyScopedOpenAIFastPolicyToUpstream(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	upstreamBodies := make(chan []byte, 2)
@@ -37,15 +37,21 @@ func TestAPIKeyAuthForwardsUserScopedOpenAIFastPolicyToUpstream(t *testing.T) {
 	settings := &service.OpenAIFastPolicySettings{
 		Rules: []service.OpenAIFastPolicyRule{
 			{
-				ServiceTier: service.OpenAIFastTierPriority,
+				ServiceTier: service.OpenAIFastTierAny,
 				Action:      service.BetaPolicyActionFilter,
 				Scope:       service.BetaPolicyScopeAll,
 			},
 			{
-				ServiceTier: service.OpenAIFastTierPriority,
-				Action:      service.BetaPolicyActionPass,
+				ServiceTier: service.OpenAIFastTierFlex,
+				Action:      service.BetaPolicyActionFilter,
 				Scope:       service.BetaPolicyScopeAll,
 				UserIDs:     []int64{42},
+			},
+			{
+				ServiceTier: service.OpenAIFastTierFlex,
+				Action:      service.OpenAIFastPolicyActionForcePriority,
+				Scope:       service.BetaPolicyScopeAll,
+				APIKeyIDs:   []int64{1},
 			},
 		},
 	}
@@ -113,7 +119,7 @@ func TestAPIKeyAuthForwardsUserScopedOpenAIFastPolicyToUpstream(t *testing.T) {
 		request := httptest.NewRequest(
 			http.MethodPost,
 			"/v1/responses",
-			bytes.NewBufferString(`{"model":"gpt-5","stream":false,"service_tier":"priority","input":"hi"}`),
+			bytes.NewBufferString(`{"model":"gpt-5","stream":false,"service_tier":"flex","input":"hi"}`),
 		)
 		request.Header.Set("Content-Type", "application/json")
 		request.Header.Set("x-api-key", apiKey)

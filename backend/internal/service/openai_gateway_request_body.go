@@ -1633,12 +1633,14 @@ func (e *OpenAIFastBlockedError) Error() string { return e.Message }
 //
 // Matching rules:
 //   - Scope filters by account type (all / oauth / apikey / bedrock)
+//   - APIKeyIDs, when present, filters by the trusted Sub2API gateway API key
 //   - UserIDs, when present, filters by the trusted Sub2API user that owns the API key
 //   - ServiceTier must be empty (= any), "all", "missing", or equal the normalized tier
+//   - IncludeMissingTier lets an "all" rule also match requests that omit service_tier
 //   - ModelWhitelist narrows the rule to specific models; FallbackAction
 //     handles the non-matching case (default: pass)
-//   - User-specific rules take precedence over global rules; each group keeps
-//     the configured first-match order
+//   - API-key-specific rules take precedence over user-specific rules, which take
+//     precedence over global rules; each group keeps the configured first-match order
 //
 // 与 Claude BetaPolicy 的差异（保留首条匹配 short-circuit）：
 //   - BetaPolicy 处理的是 anthropic-beta header 中的 token 集合，不同
@@ -1664,7 +1666,14 @@ func (s *OpenAIGatewayService) evaluateOpenAIFastPolicy(ctx context.Context, acc
 		}
 		settings = fetched
 	}
-	return evaluateOpenAIFastPolicyWithSettings(settings, openAIFastPolicyUserID(ctx), account, model, tier)
+	return evaluateOpenAIFastPolicyWithSettings(
+		settings,
+		openAIFastPolicyUserID(ctx),
+		openAIFastPolicyAPIKeyID(ctx),
+		account,
+		model,
+		tier,
+	)
 }
 
 // shouldForceOpenAIFastPriorityForMissingTier reports whether a request that
@@ -1683,18 +1692,19 @@ func (s *OpenAIGatewayService) shouldForceOpenAIFastPriorityForMissingTier(ctx c
 // long-lived sessions (e.g. WS) can prefetch settings once and avoid hitting
 // the settingService on every frame. See WSSession entry and
 // openAIFastPolicySettingsFromContext for the caching glue.
-func evaluateOpenAIFastPolicyWithSettings(settings *OpenAIFastPolicySettings, userID int64, account *Account, model, tier string) (action, errMsg string) {
+func evaluateOpenAIFastPolicyWithSettings(settings *OpenAIFastPolicySettings, userID, apiKeyID int64, account *Account, model, tier string) (action, errMsg string) {
 	if settings == nil {
 		return BetaPolicyActionPass, ""
 	}
 	isOAuth := account != nil && account.IsOAuth()
 	isBedrock := account != nil && account.IsBedrock()
 
-	// 用户专属规则先于全局规则。规则组内仍按配置顺序首条命中，允许
-	// 管理员为某位用户配置例外，而不被先出现的全局规则覆盖。
-	for _, userScoped := range []bool{true, false} {
+	// 网关 API Key 专属规则先于用户专属规则，再于全局规则。规则组内仍按
+	// 配置顺序首条命中，允许管理员为单个 Key 或用户配置例外，而不被先出现
+	// 的全局规则覆盖。
+	for _, scopeKind := range []string{"api_key", "user", "global"} {
 		for _, rule := range settings.Rules {
-			if (len(rule.UserIDs) > 0) != userScoped || !openAIFastPolicyUserMatches(rule.UserIDs, userID) {
+			if !openAIFastPolicyRuleScopeMatches(rule, scopeKind, userID, apiKeyID) {
 				continue
 			}
 			if !betaPolicyScopeMatches(rule.Scope, isOAuth, isBedrock) {
@@ -1702,7 +1712,7 @@ func evaluateOpenAIFastPolicyWithSettings(settings *OpenAIFastPolicySettings, us
 			}
 			ruleTier := strings.ToLower(strings.TrimSpace(rule.ServiceTier))
 			if tier == OpenAIFastTierMissing {
-				if ruleTier != OpenAIFastTierMissing {
+				if ruleTier != OpenAIFastTierMissing && !(rule.IncludeMissingTier && ruleTier == OpenAIFastTierAny) {
 					continue
 				}
 			} else if ruleTier != "" && ruleTier != OpenAIFastTierAny && ruleTier != tier {
@@ -1721,6 +1731,19 @@ func evaluateOpenAIFastPolicyWithSettings(settings *OpenAIFastPolicySettings, us
 	return BetaPolicyActionPass, ""
 }
 
+func openAIFastPolicyRuleScopeMatches(rule OpenAIFastPolicyRule, scopeKind string, userID, apiKeyID int64) bool {
+	switch scopeKind {
+	case "api_key":
+		return len(rule.APIKeyIDs) > 0 && openAIFastPolicyAPIKeyMatches(rule.APIKeyIDs, apiKeyID)
+	case "user":
+		return len(rule.APIKeyIDs) == 0 && len(rule.UserIDs) > 0 && openAIFastPolicyUserMatches(rule.UserIDs, userID)
+	case "global":
+		return len(rule.APIKeyIDs) == 0 && len(rule.UserIDs) == 0
+	default:
+		return false
+	}
+}
+
 func openAIFastPolicyUserID(ctx context.Context) int64 {
 	if ctx == nil {
 		return 0
@@ -1732,12 +1755,35 @@ func openAIFastPolicyUserID(ctx context.Context) int64 {
 	return userID
 }
 
+func openAIFastPolicyAPIKeyID(ctx context.Context) int64 {
+	if ctx == nil {
+		return 0
+	}
+	apiKeyID, _ := ctx.Value(ctxkey.APIKeyID).(int64)
+	if apiKeyID <= 0 {
+		return 0
+	}
+	return apiKeyID
+}
+
 func openAIFastPolicyUserMatches(ruleUserIDs []int64, userID int64) bool {
 	if len(ruleUserIDs) == 0 {
 		return true
 	}
 	for _, ruleUserID := range ruleUserIDs {
 		if ruleUserID == userID {
+			return true
+		}
+	}
+	return false
+}
+
+func openAIFastPolicyAPIKeyMatches(ruleAPIKeyIDs []int64, apiKeyID int64) bool {
+	if apiKeyID <= 0 {
+		return false
+	}
+	for _, ruleAPIKeyID := range ruleAPIKeyIDs {
+		if ruleAPIKeyID == apiKeyID {
 			return true
 		}
 	}
