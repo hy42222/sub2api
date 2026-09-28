@@ -212,7 +212,7 @@ export default {
     riskControl: '风控中心',
     securityAudit: '安全审计',
     keyIpAudit: '密钥 / IP 审计',
-    contentModeration: '内容审核',
+    contentModeration: '内容审计',
     promptAudit: '提示词审计',
     auditLogs: '操作日志',
   },
