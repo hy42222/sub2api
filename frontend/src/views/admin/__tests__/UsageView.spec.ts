@@ -34,6 +34,7 @@ const messages: Record<string, string> = {
   'admin.usage.failedToLoadUser': 'Failed to load user',
 	'admin.usage.requestId': 'Request ID',
 	'admin.usage.upstreamRequestId': 'Upstream ID',
+  'usage.tps': 'TPS',
 	'usage.requestedModel': 'Requested model',
 	'usage.sentUpstreamModel': 'Sent upstream model',
 	'usage.upstreamResponseModel': 'Upstream response model',
@@ -164,10 +165,10 @@ const GroupDistributionChartStub = {
   `,
 }
 
-const mountRouteFilteredUsageView = () => mount(UsageView, {
+const mountRouteFilteredUsageView = (usageTable: boolean | typeof UsageTableStub = true) => mount(UsageView, {
   global: { stubs: {
     AppLayout: AppLayoutStub, UsageStatsCards: true, UsageFilters: UsageFiltersStub,
-    UsageTable: true, UsageExportProgress: true, UsageCleanupDialog: true,
+    UsageTable: usageTable, UsageExportProgress: true, UsageCleanupDialog: true,
     UserBalanceHistoryModal: true, Pagination: true, Select: true,
     DateRangePicker: true, Icon: true, TokenUsageTrend: true,
     ModelDistributionChart: true, GroupDistributionChart: true,
@@ -524,6 +525,24 @@ describe('admin UsageView request ID column visibility', () => {
     )
   })
 
+  it('shows TPS by default and allows hiding it with column settings', async () => {
+    const wrapper = mountRouteFilteredUsageView(UsageTableStub)
+    await wrapper.vm.$nextTick()
+
+    const usageTable = wrapper.findComponent(UsageTableStub)
+    expect(usageTable.props('columns')).toEqual(
+      expect.arrayContaining([expect.objectContaining({ key: 'tps', label: 'TPS', sortable: false })]),
+    )
+
+    await wrapper.get('[data-testid="usage-column-settings"]').trigger('click')
+    await wrapper.get('[data-testid="usage-column-toggle-tps"]').trigger('click')
+    expect(usageTable.props('columns')).not.toEqual(
+      expect.arrayContaining([expect.objectContaining({ key: 'tps' })]),
+    )
+    expect(localStorage.setItem).toHaveBeenCalledWith('usage-hidden-columns', expect.stringContaining('tps'))
+    wrapper.unmount()
+  })
+
   it('keeps upstream ID hidden by default and allows enabling it from column settings', async () => {
     const wrapper = mount(UsageView, {
       global: {
@@ -797,6 +816,33 @@ describe('admin UsageView model audit export', () => {
 		])
 		const row = sheetAddAoa.mock.calls[0][1][0]
 		expect(row.slice(4, 8)).toEqual(['gpt-5.6-sol', 'gpt-5.5', 'gpt-5.4', 'Yes'])
+		expect(row[headers.indexOf('TPS')]).toBe(100)
 		expect(saveAs).toHaveBeenCalledTimes(1)
 	})
+
+  it('exports numeric TPS and leaves unavailable performance cells empty', async () => {
+    const performance = [
+      { duration_ms: 6000 },
+      { duration_ms: null },
+      { duration_ms: 0 },
+      { duration_ms: 6000, image_count: 1, billing_mode: 'token' },
+      { duration_ms: 6000, billing_mode: 'video' },
+    ]
+    exportList.mockResolvedValueOnce({
+      items: performance.map((fields, index) => ({
+        id: index + 1, model: 'gpt-5.4', input_tokens: 8000, output_tokens: 120,
+        total_cost: 0, actual_cost: 0, ...fields,
+      })),
+      total: performance.length,
+      pages: 1,
+    })
+    const wrapper = mountRouteFilteredUsageView()
+    await (wrapper.vm as any).exportToExcel()
+
+    const headers = aoaToSheet.mock.calls[0][0][0]
+    const rows = sheetAddAoa.mock.calls[0][1]
+    expect(rows.map((row: unknown[]) => row[headers.indexOf('TPS')])).toEqual([20, '', '', '', ''])
+    expect(rows.every((row: unknown[]) => row.length === headers.length)).toBe(true)
+    wrapper.unmount()
+  })
 })

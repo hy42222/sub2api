@@ -205,6 +205,16 @@
           </div>
         </template>
 
+        <template #cell-tps="{ row }">
+          <span
+            data-testid="usage-tps"
+            class="whitespace-nowrap text-sm tabular-nums text-gray-900 dark:text-white"
+            :title="t('usage.tpsHint')"
+          >
+            {{ formatTps(row) }}
+          </span>
+        </template>
+
         <template #cell-cost="{ row }">
           <div class="text-sm">
             <div class="flex items-center gap-1.5">
@@ -603,6 +613,7 @@ import { formatCacheTokens, formatMultiplier } from '@/utils/formatters'
 import { formatTokenPricePerMillion } from '@/utils/usagePricing'
 import { getUsageServiceTierLabel } from '@/utils/usageServiceTier'
 import { resolveUsageRequestType } from '@/utils/usageRequestType'
+import { getUsageTps } from '@/utils/usageTps'
 import {
   LATENCY_BAR_CLASSES,
   LATENCY_BAR_FROM_CLASSES,
@@ -865,6 +876,11 @@ const formatDuration = (ms: number | null | undefined): string => {
   const totalSec = Math.round(ms / 1000)
   if (totalSec < 3600) return `${Math.floor(totalSec / 60)}m ${totalSec % 60}s`
   return `${Math.floor(totalSec / 3600)}h ${Math.floor((totalSec % 3600) / 60)}m`
+}
+
+const formatTps = (row: AdminUsageLog): string => {
+  const tps = getUsageTps(row)
+  return tps == null ? '-' : `${tps.toFixed(2)} ${t('usage.tokensPerSecond')}`
 }
 
 // Cost tooltip functions

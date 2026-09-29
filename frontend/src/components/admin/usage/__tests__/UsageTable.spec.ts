@@ -51,6 +51,8 @@ const messages: Record<string, string> = {
   'usage.imageSizeSource': 'Size source',
   'usage.imageSizeBreakdown': 'Size breakdown',
   'usage.imageSizeSourceOutput': 'Upstream output',
+  'usage.tokensPerSecond': 'Tokens/s',
+  'usage.tpsHint': 'Output tokens divided by total duration',
   'usage.imageSizeSourceInput': 'Request input',
   'usage.imageSizeSourceDefault': 'Default billing tier',
   'usage.imageSizeSourceLegacy': 'Legacy record',
@@ -107,6 +109,7 @@ const DataTableStub = {
         <slot name="cell-reasoning_effort" :row="row" :value="row.reasoning_effort" />
         <slot name="cell-billing_mode" :row="row" />
         <slot name="cell-tokens" :row="row" />
+        <slot name="cell-tps" :row="row" />
         <slot name="cell-cost" :row="row" />
         <slot name="cell-request_id" :row="row" />
         <slot name="cell-upstream_request_id" :row="row" />
@@ -618,6 +621,73 @@ describe('admin UsageTable tooltip', () => {
     expect(text).toContain('Per-image price')
     expect(text).toContain('not recorded')
     expect(text).not.toContain('(2K)')
+  })
+})
+
+describe('admin UsageTable TPS', () => {
+  it('calculates output tokens per total request second', () => {
+    const wrapper = mount(UsageTable, {
+      props: {
+        data: [{
+          ...baseImageRow,
+          request_id: 'req-tps',
+          billing_mode: 'token',
+          image_count: 0,
+          output_tokens: 120,
+          duration_ms: 6000,
+        }],
+        loading: false,
+        columns: [],
+      },
+      global: {
+        stubs: {
+          DataTable: DataTableStub,
+          EmptyState: true,
+          Icon: true,
+          Teleport: true,
+        },
+      },
+    })
+
+    expect(wrapper.get('[data-testid="usage-tps"]').text()).toBe('20.00 Tokens/s')
+    expect(wrapper.get('[data-testid="usage-tps"]').attributes('title')).toBe(messages['usage.tpsHint'])
+    wrapper.unmount()
+  })
+
+  it.each([
+    { duration_ms: null },
+    { duration_ms: 0 },
+    { duration_ms: -1 },
+    { output_tokens: 0 },
+    { image_count: 1 },
+    { billing_mode: 'video' },
+  ])('shows a dash for unavailable TPS: %o', (missing) => {
+    const wrapper = mount(UsageTable, {
+      props: {
+        data: [{
+          ...baseImageRow,
+          request_id: 'req-tps-missing',
+          billing_mode: 'token',
+          image_count: 0,
+          output_tokens: 120,
+          duration_ms: 6000,
+          ...missing,
+        }],
+        loading: false,
+        columns: [],
+      },
+      global: {
+        stubs: {
+          DataTable: DataTableStub,
+          EmptyState: true,
+          Icon: true,
+          Teleport: true,
+        },
+      },
+    })
+
+    expect(wrapper.get('[data-testid="usage-tps"]').text()).toBe('-')
+    wrapper.unmount()
   })
 })
 
