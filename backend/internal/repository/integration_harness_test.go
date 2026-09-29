@@ -25,6 +25,7 @@ import (
 	entsql "entgo.io/ent/dialect/sql"
 	_ "github.com/lib/pq"
 	redisclient "github.com/redis/go-redis/v9"
+	testcontainers "github.com/testcontainers/testcontainers-go"
 	tcpostgres "github.com/testcontainers/testcontainers-go/modules/postgres"
 	tcredis "github.com/testcontainers/testcontainers-go/modules/redis"
 )
@@ -61,13 +62,22 @@ func TestMain(m *testing.M) {
 	}
 
 	postgresImage := selectDockerImage(ctx, postgresImageTag)
-	pgContainer, err := tcpostgres.Run(
-		ctx,
-		postgresImage,
+	pgOptions := []testcontainers.ContainerCustomizer{
 		tcpostgres.WithDatabase("sub2api_test"),
 		tcpostgres.WithUsername("postgres"),
 		tcpostgres.WithPassword("postgres"),
 		tcpostgres.BasicWaitStrategies(),
+	}
+	if os.Getenv("SUB2API_TEST_POSTGRES_TMPFS") == "1" {
+		// Avoid the image's nested anonymous volume on PostgreSQL 15-17.
+		pgOptions = append(pgOptions,
+			testcontainers.WithTmpfs(map[string]string{"/var/lib/postgresql": "rw,size=16g"}),
+			testcontainers.WithEnv(map[string]string{"PGDATA": "/var/lib/postgresql/sub2api-test-data"}))
+	}
+	pgContainer, err := tcpostgres.Run(
+		ctx,
+		postgresImage,
+		pgOptions...,
 	)
 	if err != nil {
 		log.Printf("failed to start postgres container: %v", err)

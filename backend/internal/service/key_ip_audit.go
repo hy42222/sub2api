@@ -43,11 +43,37 @@ type KeyIPAuditFilter struct {
 }
 
 type KeyIPAuditCoverage struct {
-	Source                string  `json:"source"`
-	UsageLogCount         int64   `json:"usage_log_count"`
-	MissingIPCount        int64   `json:"missing_ip_count"`
-	MissingUserAgentCount int64   `json:"missing_user_agent_count"`
-	IPCoveragePercent     float64 `json:"ip_coverage_percent"`
+	Source                string    `json:"source"`
+	Reason                string    `json:"reason"`
+	UsageLogCount         int64     `json:"usage_log_count"`
+	MissingIPCount        int64     `json:"missing_ip_count"`
+	MissingUserAgentCount int64     `json:"missing_user_agent_count"`
+	IPCoveragePercent     float64   `json:"ip_coverage_percent"`
+	LiveSince             time.Time `json:"live_since"`
+	DataThrough           time.Time `json:"data_through"`
+	AggregationLagSeconds int64     `json:"aggregation_lag_seconds"`
+	CoverageComplete      bool      `json:"coverage_complete"`
+	RiskContextComplete   bool      `json:"risk_context_complete"`
+}
+
+// KeyIPAuditRiskContextComplete reports whether the available history covers
+// the prior window needed to evaluate risk for the selected time range.
+func KeyIPAuditRiskContextComplete(filter KeyIPAuditFilter, coverage KeyIPAuditCoverage) bool {
+	if !coverage.CoverageComplete || filter.StartTime.IsZero() || filter.EndTime.IsZero() {
+		return false
+	}
+
+	duration := filter.EndTime.Sub(filter.StartTime)
+	if duration <= 0 {
+		return false
+	}
+
+	priorFrom := filter.StartTime.Add(-duration)
+	rollingFrom := filter.StartTime.Add(-KeyIPAuditRollingWindow)
+	if rollingFrom.Before(priorFrom) {
+		priorFrom = rollingFrom
+	}
+	return !priorFrom.Before(coverage.LiveSince)
 }
 
 type KeyIPAuditMetadata struct {
@@ -404,8 +430,8 @@ func NormalizeKeyIPAuditFilter(filter *KeyIPAuditFilter, now time.Time) error {
 		}
 	}
 	filter.Risk = strings.ToLower(strings.TrimSpace(filter.Risk))
-	if filter.Risk != "" && filter.Risk != "all" && filter.Risk != "none" && filter.Risk != "low" && filter.Risk != "medium" && filter.Risk != "high" {
-		return fmt.Errorf("%w: risk must be none, low, medium, or high", ErrKeyIPAuditInvalidFilter)
+	if filter.Risk != "" && filter.Risk != "all" && filter.Risk != "none" && filter.Risk != "medium" && filter.Risk != "high" {
+		return fmt.Errorf("%w: risk must be none, medium, or high", ErrKeyIPAuditInvalidFilter)
 	}
 	filter.Status = strings.ToLower(strings.TrimSpace(filter.Status))
 	if filter.Status == "all" {

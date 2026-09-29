@@ -1,7 +1,7 @@
 export default {
   keyIpAudit: {
     title: 'Key / IP Audit',
-    description: 'Usage-log activity and risk signals for the selected time range.',
+    description: 'Projected request activity and risk signals for the selected time range.',
     refresh: 'Refresh audit',
     loading: 'Loading key audit',
     loadFailed: 'Failed to load key/IP audit data',
@@ -60,7 +60,6 @@ export default {
     },
     risk: {
       none: 'None',
-      low: 'Low',
       medium: 'Medium',
       high: 'High',
       critical: 'Critical',
@@ -185,10 +184,16 @@ export default {
     metadata: {
       title: 'Data coverage',
       source: 'Source',
-      logs: 'Usage logs',
+      logs: 'Projected requests',
       missingIp: 'Missing IP',
       missingUserAgent: 'Missing User-Agent',
-      ipCoverage: 'IP coverage'
+      ipCoverage: 'IP coverage',
+      liveSince: 'Projection starts',
+      dataThrough: 'Processed through',
+      sourceProjection: 'Future activity projection',
+      historyUncovered: 'The selected period predates the projection. Historical records were not backfilled; totals include projected activity only.',
+      pendingCoverage: 'The selected period is not fully covered yet. Current totals may be incomplete.',
+      riskContextIncomplete: 'The selected period has limited history; risk signals may be incomplete.'
     }
   }
 }

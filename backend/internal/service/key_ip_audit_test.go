@@ -41,12 +41,90 @@ func TestKeyIPAuditNormalizeFilter(t *testing.T) {
 		{name: "negative id", filter: &KeyIPAuditFilter{APIKeyID: -1}},
 		{name: "invalid ip", filter: &KeyIPAuditFilter{IP: "not-an-ip"}},
 		{name: "invalid risk", filter: &KeyIPAuditFilter{Risk: "critical"}},
+		{name: "unsupported low risk", filter: &KeyIPAuditFilter{Risk: "low"}},
 	}
 	for _, tc := range invalid {
 		t.Run(tc.name, func(t *testing.T) {
 			err := NormalizeKeyIPAuditFilter(tc.filter, now)
 			require.Error(t, err)
 			require.ErrorIs(t, err, ErrKeyIPAuditInvalidFilter)
+		})
+	}
+}
+
+func TestKeyIPAuditRiskContextComplete(t *testing.T) {
+	start := time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC)
+	tests := []struct {
+		name     string
+		filter   KeyIPAuditFilter
+		coverage KeyIPAuditCoverage
+		want     bool
+	}{
+		{
+			name: "inclusive live since boundary",
+			filter: KeyIPAuditFilter{
+				StartTime: start,
+				EndTime:   start.Add(5 * time.Minute),
+			},
+			coverage: KeyIPAuditCoverage{
+				LiveSince:        start.Add(-KeyIPAuditRollingWindow),
+				CoverageComplete: true,
+			},
+			want: true,
+		},
+		{
+			name: "equal length prior window",
+			filter: KeyIPAuditFilter{
+				StartTime: start,
+				EndTime:   start.Add(time.Hour),
+			},
+			coverage: KeyIPAuditCoverage{
+				LiveSince:        start.Add(-30 * time.Minute),
+				CoverageComplete: true,
+			},
+			want: false,
+		},
+		{
+			name: "minimum ten minute lookback for shorter window",
+			filter: KeyIPAuditFilter{
+				StartTime: start,
+				EndTime:   start.Add(5 * time.Minute),
+			},
+			coverage: KeyIPAuditCoverage{
+				LiveSince:        start.Add(-9 * time.Minute),
+				CoverageComplete: true,
+			},
+			want: false,
+		},
+		{
+			name: "incomplete activity coverage",
+			filter: KeyIPAuditFilter{
+				StartTime: start,
+				EndTime:   start.Add(time.Hour),
+			},
+			coverage: KeyIPAuditCoverage{
+				LiveSince:        start.Add(-24 * time.Hour),
+				CoverageComplete: false,
+			},
+			want: false,
+		},
+		{
+			name: "non-positive window",
+			filter: KeyIPAuditFilter{
+				StartTime: start,
+				EndTime:   start,
+			},
+			coverage: KeyIPAuditCoverage{
+				LiveSince:        start.Add(-24 * time.Hour),
+				CoverageComplete: true,
+			},
+			want: false,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			require.Equal(t, tc.want, KeyIPAuditRiskContextComplete(tc.filter, tc.coverage))
 		})
 	}
 }

@@ -267,12 +267,15 @@
               <section class="border-t border-gray-100 pt-5 dark:border-dark-800">
                 <h3 class="section-title mb-3">{{ t('admin.keyIpAudit.metadata.title') }}</h3>
                 <dl class="grid gap-x-5 gap-y-3 text-xs sm:grid-cols-2">
-                  <div><dt class="audit-label">{{ t('admin.keyIpAudit.metadata.source') }}</dt><dd class="audit-value">{{ detail.metadata.coverage.source }}</dd></div>
+                  <div><dt class="audit-label">{{ t('admin.keyIpAudit.metadata.source') }}</dt><dd class="audit-value">{{ t('admin.keyIpAudit.metadata.sourceProjection') }}</dd></div>
                   <div><dt class="audit-label">{{ t('admin.keyIpAudit.metadata.logs') }}</dt><dd class="audit-value">{{ formatNumber(detail.metadata.coverage.usage_log_count) }}</dd></div>
                   <div><dt class="audit-label">{{ t('admin.keyIpAudit.metadata.missingIp') }}</dt><dd class="audit-value">{{ formatNumber(detail.metadata.coverage.missing_ip_count) }}</dd></div>
                   <div><dt class="audit-label">{{ t('admin.keyIpAudit.metadata.missingUserAgent') }}</dt><dd class="audit-value">{{ formatNumber(detail.metadata.coverage.missing_user_agent_count) }}</dd></div>
                   <div><dt class="audit-label">{{ t('admin.keyIpAudit.metadata.ipCoverage') }}</dt><dd class="audit-value">{{ detail.metadata.coverage.ip_coverage_percent }}%</dd></div>
                 </dl>
+                <p v-if="coverageNotice" class="mt-3 border-l-2 border-amber-500 pl-3 text-xs text-amber-800 dark:text-amber-300" role="status">
+                  {{ coverageNotice }}
+                </p>
               </section>
             </div>
           </div>
@@ -283,7 +286,7 @@
 </template>
 
 <script setup lang="ts">
-import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import Icon from '@/components/icons/Icon.vue'
 import LoadingSpinner from '@/components/common/LoadingSpinner.vue'
@@ -295,7 +298,7 @@ import type {
   KeyAuditTrustedRule,
   KeyRiskLevel
 } from '@/features/key-ip-audit/types'
-import { formatUnknown } from '@/features/key-ip-audit/viewModel'
+import { formatUnknown, keyAuditCoverageNotice } from '@/features/key-ip-audit/viewModel'
 
 const props = withDefaults(defineProps<{
   show: boolean
@@ -355,6 +358,11 @@ const trustedInputId = `${titleId}-trusted-network`
 const trustedNoteId = `${titleId}-trusted-note`
 const dismissalIpId = `${titleId}-dismissal-ip`
 
+const coverageNotice = computed(() => {
+  const key = keyAuditCoverageNotice(props.detail?.metadata ?? null)
+  return key ? t(`admin.keyIpAudit.metadata.${key}`) : ''
+})
+
 function close() {
   if (!props.busy && !props.suspended) emit('close')
 }
@@ -407,10 +415,9 @@ function auditStatusLabel(status: string): string {
 }
 
 function riskBadgeClass(level: KeyRiskLevel): string {
-  const classes: Record<KeyRiskLevel, string> = {
-    none: 'audit-badge bg-gray-100 text-gray-600 dark:bg-dark-800 dark:text-dark-300',
-    low: 'audit-badge bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300',
-    medium: 'audit-badge bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300',
+	const classes: Record<KeyRiskLevel, string> = {
+		none: 'audit-badge bg-gray-100 text-gray-600 dark:bg-dark-800 dark:text-dark-300',
+		medium: 'audit-badge bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300',
     high: 'audit-badge bg-red-50 text-red-700 dark:bg-red-900/30 dark:text-red-300'
   }
   return classes[level]

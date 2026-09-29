@@ -66,3 +66,31 @@ func tryAcquireSingletonLeaderLock(ctx context.Context, cache LeaderLockCache, d
 	// No coordination backend available: run without gating.
 	return func() {}, true
 }
+
+// tryAcquireSingletonLeaderLockFailClosed uses one coordination domain for a
+// job when Redis is configured. Falling back to PostgreSQL after a Redis error
+// would let two instances hold different locks during a partial outage.
+func tryAcquireSingletonLeaderLockFailClosed(ctx context.Context, cache LeaderLockCache, db *sql.DB, key, owner string, ttl time.Duration) (func(), bool, error) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	if cache != nil {
+		ok, err := cache.TryAcquireLeaderLock(ctx, key, owner, ttl)
+		if err != nil {
+			return nil, false, err
+		}
+		if !ok {
+			return nil, false, nil
+		}
+		release := func() {
+			ctx2, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+			defer cancel()
+			_ = cache.ReleaseLeaderLock(ctx2, key, owner)
+		}
+		return release, true, nil
+	}
+	if db != nil {
+		return tryAcquireDBAdvisoryLockWithError(ctx, db, hashAdvisoryLockID(key))
+	}
+	return func() {}, true, nil
+}

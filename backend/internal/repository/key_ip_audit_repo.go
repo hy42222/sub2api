@@ -650,7 +650,7 @@ func (r *keyIPAuditRepository) ListKeys(ctx context.Context, filter service.KeyI
 	defer cancel()
 	defer func() { _ = tx.Rollback() }()
 
-	result, err := r.listKeys(readCtx, tx, filter, 0)
+	result, err := r.listKeysMaterialized(readCtx, tx, filter, 0)
 	if err != nil {
 		return nil, err
 	}
@@ -667,7 +667,12 @@ func (r *keyIPAuditRepository) beginKeyIPAuditRead(ctx context.Context) (context
 	readCtx, cancel := context.WithTimeout(ctx, keyIPAuditReadTimeout)
 	tx, err := r.db.BeginTx(readCtx, &sql.TxOptions{
 		Isolation: sql.LevelRepeatableRead,
-		ReadOnly:  true,
+		// The materialized read path builds a session-local temporary table so
+		// the expensive scoring CTE is evaluated once for the list, summary,
+		// coverage, and trend queries. PostgreSQL rejects CREATE TEMP TABLE AS
+		// inside a READ ONLY transaction; this transaction still writes no
+		// persistent application data.
+		ReadOnly: false,
 	})
 	if err != nil {
 		cancel()
@@ -747,8 +752,8 @@ func scanKeyIPAuditKeyAggregate(scanner interface{ Scan(...any) error }) (*servi
 	var (
 		a          service.KeyIPAuditKeyAggregate
 		latestIP   sql.NullString
-		rawNew    int64
-		rawVolume bool
+		rawNew     int64
+		rawVolume  bool
 		volume     bool
 		hasDismiss bool
 	)
@@ -900,7 +905,7 @@ func (r *keyIPAuditRepository) KeyDetail(ctx context.Context, filter service.Key
 	keyFilter := filter
 	keyFilter.Page = 1
 	keyFilter.PageSize = 1
-	keyList, err := r.listKeys(readCtx, tx, keyFilter, 0)
+	keyList, err := r.listKeysMaterialized(readCtx, tx, keyFilter, 0)
 	if err != nil {
 		return nil, err
 	}
@@ -908,7 +913,7 @@ func (r *keyIPAuditRepository) KeyDetail(ctx context.Context, filter service.Key
 		return nil, service.ErrAPIKeyNotFound
 	}
 
-	ips, ipsTotal, err := r.queryKeyIPAuditIPs(readCtx, tx, filter, ipPage, ipPageSize)
+	ips, ipsTotal, err := r.queryKeyIPAuditIPsMaterialized(readCtx, tx, filter, ipPage, ipPageSize)
 	if err != nil {
 		return nil, err
 	}
@@ -918,7 +923,7 @@ func (r *keyIPAuditRepository) KeyDetail(ctx context.Context, filter service.Key
 	relatedKeys := make([]service.KeyIPAuditKeyRow, 0)
 	var relatedTotal int64
 	if relatedIP != "" {
-		used, err := r.keyUsedIP(readCtx, tx, filter.APIKeyID, filter.StartTime, filter.EndTime, relatedIP)
+		used, err := r.keyUsedIPMaterialized(readCtx, tx, filter.APIKeyID, filter.StartTime, filter.EndTime, relatedIP)
 		if err != nil {
 			return nil, err
 		}
@@ -928,7 +933,7 @@ func (r *keyIPAuditRepository) KeyDetail(ctx context.Context, filter service.Key
 			relatedFilter.IP = relatedIP
 			relatedFilter.Page = relatedPage
 			relatedFilter.PageSize = relatedPageSize
-			relatedList, err := r.listKeys(readCtx, tx, relatedFilter, filter.APIKeyID)
+			relatedList, err := r.listKeysMaterialized(readCtx, tx, relatedFilter, filter.APIKeyID)
 			if err != nil {
 				return nil, err
 			}
