@@ -1,6 +1,6 @@
 export type KeyId = number
 
-export type KeyRiskLevel = 'none' | 'low' | 'medium' | 'high'
+export type KeyRiskLevel = 'none' | 'medium' | 'high'
 
 export type KeyAuditDisposition = 'open' | 'dismissed' | 'normal'
 
@@ -52,11 +52,17 @@ export interface KeyAuditTrendPoint {
 }
 
 export interface KeyAuditCoverage {
-  source: 'usage_logs' | string
+  source: 'security_activity_projection' | string
+  reason: 'complete' | 'history_unavailable' | 'projection_pending' | string
   usage_log_count: number
   missing_ip_count: number
   missing_user_agent_count: number
   ip_coverage_percent: number
+  live_since: string
+  data_through: string
+  aggregation_lag_seconds: number
+  coverage_complete: boolean
+  risk_context_complete: boolean
 }
 
 export interface KeyAuditMetadata {

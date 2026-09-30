@@ -86,6 +86,27 @@ func TestTryAcquireSingletonLeaderLock_CacheErrorFallsThrough(t *testing.T) {
 	require.NotPanics(t, release)
 }
 
+func TestTryAcquireSingletonLeaderLockFailClosed_CacheErrorIsReported(t *testing.T) {
+	cache := &fakeLeaderLockCache{acquireErr: context.DeadlineExceeded}
+	release, ok, err := tryAcquireSingletonLeaderLockFailClosed(
+		context.Background(), cache, nil, "k", "inst", time.Minute,
+	)
+	require.ErrorIs(t, err, context.DeadlineExceeded)
+	require.False(t, ok)
+	require.Nil(t, release)
+}
+
+func TestTryAcquireSingletonLeaderLockFailClosed_ContentionIsNotAnError(t *testing.T) {
+	cache := &fakeLeaderLockCache{}
+	_, _ = cache.TryAcquireLeaderLock(context.Background(), "k", "peer", time.Minute)
+	release, ok, err := tryAcquireSingletonLeaderLockFailClosed(
+		context.Background(), cache, nil, "k", "inst", time.Minute,
+	)
+	require.NoError(t, err)
+	require.False(t, ok)
+	require.Nil(t, release)
+}
+
 func TestSubscriptionExpiryService_ReminderSkipsScanWhenNotLeader(t *testing.T) {
 	cache := &fakeLeaderLockCache{}
 	// A peer already holds the reminder leader lock.

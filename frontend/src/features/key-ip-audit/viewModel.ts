@@ -1,6 +1,7 @@
 import type {
   KeyAuditDetailQuery,
   KeyAuditFilters,
+  KeyAuditMetadata,
   KeyAuditListQuery,
   KeyAuditSignal,
   KeyAuditTimeRange,
@@ -19,6 +20,21 @@ export interface KeyAuditWindow {
 }
 
 export type KeyAuditRangeError = 'required' | 'invalid' | 'future' | 'too_long'
+
+export type KeyAuditCoverageNotice =
+  | 'historyUncovered'
+  | 'pendingCoverage'
+  | 'riskContextIncomplete'
+
+export function keyAuditCoverageNotice(metadata: KeyAuditMetadata | null): KeyAuditCoverageNotice | null {
+  if (!metadata) return null
+  if (!metadata.coverage.coverage_complete) {
+    return metadata.coverage.reason === 'history_unavailable'
+      ? 'historyUncovered'
+      : 'pendingCoverage'
+  }
+  return metadata.coverage.risk_context_complete ? null : 'riskContextIncomplete'
+}
 
 export function createDefaultKeyAuditFilters(): KeyAuditFilters {
   return {

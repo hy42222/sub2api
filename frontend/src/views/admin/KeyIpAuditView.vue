@@ -64,14 +64,19 @@
         <div v-if="metadata" class="border-t border-gray-100 px-4 py-4 dark:border-dark-800 sm:px-5">
           <div class="mb-3 flex flex-wrap items-baseline justify-between gap-2">
             <h3 class="text-sm font-semibold text-gray-800 dark:text-gray-200">{{ t('admin.keyIpAudit.metadata.title') }}</h3>
-            <span class="text-xs text-gray-500 dark:text-dark-400">{{ metadata.coverage.source }}</span>
+            <span class="text-xs text-gray-500 dark:text-dark-400">{{ t('admin.keyIpAudit.metadata.sourceProjection') }}</span>
           </div>
           <dl class="grid grid-cols-2 gap-x-5 gap-y-3 text-xs sm:grid-cols-4">
             <div><dt class="metadata-label">{{ t('admin.keyIpAudit.metadata.logs') }}</dt><dd class="metadata-value">{{ formatNumber(metadata.coverage.usage_log_count) }}</dd></div>
             <div><dt class="metadata-label">{{ t('admin.keyIpAudit.metadata.missingIp') }}</dt><dd class="metadata-value">{{ formatNumber(metadata.coverage.missing_ip_count) }}</dd></div>
             <div><dt class="metadata-label">{{ t('admin.keyIpAudit.metadata.missingUserAgent') }}</dt><dd class="metadata-value">{{ formatNumber(metadata.coverage.missing_user_agent_count) }}</dd></div>
             <div><dt class="metadata-label">{{ t('admin.keyIpAudit.metadata.ipCoverage') }}</dt><dd class="metadata-value">{{ metadata.coverage.ip_coverage_percent }}%</dd></div>
+            <div><dt class="metadata-label">{{ t('admin.keyIpAudit.metadata.liveSince') }}</dt><dd class="metadata-value">{{ formatCoverageTime(metadata.coverage.live_since) }}</dd></div>
+            <div><dt class="metadata-label">{{ t('admin.keyIpAudit.metadata.dataThrough') }}</dt><dd class="metadata-value">{{ formatCoverageTime(metadata.coverage.data_through) }}</dd></div>
           </dl>
+          <p v-if="coverageNotice" class="mt-3 border-l-2 border-amber-500 pl-3 text-xs text-amber-800 dark:text-amber-300" role="status">
+            {{ coverageNotice }}
+          </p>
         </div>
 
         <p v-if="loadError && !rows.length" class="border-t border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900/40 dark:bg-red-900/20 dark:text-red-300" role="alert">{{ loadError }}</p>
@@ -288,6 +293,7 @@ import {
   DEFAULT_KEY_AUDIT_RELATED_PAGE_SIZE,
   DEFAULT_KEY_AUDIT_TRUSTED_PAGE_SIZE,
   isAbortError,
+  keyAuditCoverageNotice,
   resolveKeyAuditWindow,
   validateCustomKeyAuditRange,
   type KeyAuditWindow
@@ -361,7 +367,6 @@ const columns = computed<Column[]>(() => [
 const riskOptions = computed(() => [
   { value: '', label: t('admin.keyIpAudit.filters.allRisk') },
   { value: 'none', label: t('admin.keyIpAudit.risk.none') },
-  { value: 'low', label: t('admin.keyIpAudit.risk.low') },
   { value: 'medium', label: t('admin.keyIpAudit.risk.medium') },
   { value: 'high', label: t('admin.keyIpAudit.risk.high') }
 ])
@@ -399,6 +404,11 @@ const rangeError = computed(() => {
 const trendBars = computed(() => {
   const maximum = Math.max(...trend.value.map(point => point.request_count), 1)
   return trend.value.map(point => ({ ...point, height: Math.max(8, Math.round((point.request_count / maximum) * 100)) }))
+})
+
+const coverageNotice = computed(() => {
+	const key = keyAuditCoverageNotice(metadata.value)
+	return key ? t(`admin.keyIpAudit.metadata.${key}`) : ''
 })
 
 const confirmDialogTitle = computed(() => {
@@ -827,9 +837,15 @@ async function copySecret(): Promise<void> {
 }
 
 function formatTime(value: string | null | undefined): string {
-  if (!value) return t('admin.keyIpAudit.unknownIp')
+	if (!value) return t('common.unknown')
   const date = new Date(value)
   return Number.isNaN(date.getTime()) ? value : date.toLocaleString()
+}
+
+function formatCoverageTime(value: string | null | undefined): string {
+	if (!value) return t('common.unknown')
+	const date = new Date(value)
+	return Number.isNaN(date.getTime()) || date.getUTCFullYear() < 2000 ? t('common.unknown') : date.toLocaleString()
 }
 
 function formatNumber(value: number | null | undefined): string {
@@ -844,10 +860,9 @@ function riskLabel(level: KeyRiskLevel): string { return t(`admin.keyIpAudit.ris
 function auditStatusLabel(status: string): string { return t(`admin.keyIpAudit.auditStatus.${status}`) }
 
 function riskBadgeClass(level: KeyRiskLevel): string {
-  const classes: Record<KeyRiskLevel, string> = {
-    none: 'audit-badge bg-gray-100 text-gray-600 dark:bg-dark-800 dark:text-dark-300',
-    low: 'audit-badge bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300',
-    medium: 'audit-badge bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300',
+	const classes: Record<KeyRiskLevel, string> = {
+		none: 'audit-badge bg-gray-100 text-gray-600 dark:bg-dark-800 dark:text-dark-300',
+		medium: 'audit-badge bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300',
     high: 'audit-badge bg-red-50 text-red-700 dark:bg-red-900/30 dark:text-red-300'
   }
   return classes[level]

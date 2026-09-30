@@ -1,7 +1,7 @@
 export default {
   keyIpAudit: {
     title: '密钥 / IP 审计',
-    description: '所选时间范围内的用量日志活动与风险信号。',
+    description: '所选时间范围内的已投影请求活动与风险信号。',
     refresh: '刷新审计',
     loading: '正在加载密钥审计',
     loadFailed: '加载密钥 / IP 审计数据失败',
@@ -60,7 +60,6 @@ export default {
     },
     risk: {
       none: '无',
-      low: '低',
       medium: '中',
       high: '高',
       critical: '严重',
@@ -185,10 +184,16 @@ export default {
     metadata: {
       title: '数据覆盖范围',
       source: '数据来源',
-      logs: '用量日志',
+      logs: '已投影请求',
       missingIp: '缺失 IP',
       missingUserAgent: '缺失 User-Agent',
-      ipCoverage: 'IP 覆盖率'
+      ipCoverage: 'IP 覆盖率',
+      liveSince: '投影起点',
+      dataThrough: '已处理至',
+      sourceProjection: '未来活动投影',
+      historyUncovered: '所选时间早于投影起点，历史记录未回填，统计仅包含已投影的数据。',
+      pendingCoverage: '所选时间尚未完全覆盖，当前统计可能不完整。',
+      riskContextIncomplete: '所选时间范围的历史数据有限，风险信号可能不完整。'
     }
   }
 }
